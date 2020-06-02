@@ -11,8 +11,7 @@ global H_T; H_T = 0.6715 * 1.0226;
 %%
 % Precision value: smaller gives more precise result. This single value
 % affects various tolerance values in different algorithms.
-global a0; a0 = 10^-12;
-%%
+global a0; a0 = 10^-3;%%
 % Maximum t-value for differential equation solver, in giga years and
 % starting from the big bang.
 % In some cases it is wanted that the solver is terminated after point
@@ -43,27 +42,27 @@ global omega_L_opt
 % that you don't want.
 
 %[a_res, t_res, omega_LR] = LR_model(1,0, 1,true);
-%-t_res(1) - 10* 2/(3*H_T)
+%disp(-t_res(1) - 10* 2/(3*H_T))
 
 % Kuva 1 / Fig 1
-final_plot_1()
+%final_plot_1()
 
 % Kuva 2 / Fig 3
 final_plot_50()
 
 % Kuva 3 / Fig 4
-final_plot_3()
+%final_plot_3()
 
 % Kuva 4 / Fig 5-7
-final_plot_4()
+%final_plot_4()
 
 % Kuva 5 / Fig 8-16
-final_plot_many_B()
+%final_plot_many_B()
 
 % Kuva 6 / 19 yhtälö 25
-[omegaB, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
-print_table_two_col([omegaB,omegaLR,omegaL,T])
-print_table_two_col([omegaB, omegaLR_lin, omegaL_lin])
+%[omegaB, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
+%print_table_two_col([omegaB,omegaLR,omegaL,T])
+%print_table_two_col([omegaB, omegaLR_lin, omegaL_lin])
 
 %% Differential equations
 % Here we define the differential equations used.
@@ -109,7 +108,7 @@ end
 % 
 % $$\Omega^{\Lambda R}_t = \frac{H \sqrt{\Omega^{\Lambda}}}{a} b.$$
 
-function [a_res, t_res, omega_LR] = F_model(omegaBD,omegaL, terminate_T)
+function [a_res, t_res, omega_LR] = F_model2(omegaBD,omegaL, terminate_T)
     % Load global variables
     global H_T t_end a0;
     
@@ -140,9 +139,20 @@ function [a_res, t_res, omega_LR] = F_model(omegaBD,omegaL, terminate_T)
     omega_LR = H_T .* sqrt(omegaL) .* ab(:,2) ./ a_res;
 end
 
+function [a_res, t_res, omega_LR] = F_model(omegaBD,omegaL, terminate_T)
+    global H_T t_end a0;
+    
+    [a_res,b_res,t_res] = runge_kutta(@(t, a, b)H_T * sqrt(omegaBD/a + omegaL*a^2),...
+                                      @(t, a, b)a * exp(-H_T * sqrt(omegaL) * t),...
+                                      a0,0,0,...
+                                      t_end/10, a0/10, terminate_T);
+                                  
+    omega_LR = H_T .* sqrt(omegaL) .* b_res ./ a_res;
+end
+
 %%
 % Very similar to Friedmann algrorithm. See comments above.
-function [a_res, t_res, omega_LR] = LR_model(omegaB,omegaL, alpha, terminate_T)
+function [a_res, t_res, omega_LR] = LR_model2(omegaB,omegaL, alpha, terminate_T)
     global H_T t_end a0;
     options = odeset('Events',@(t,ab)eventFunction(t,ab,terminate_T),...
                      'MaxStep',a0^(1/6),...
@@ -166,6 +176,17 @@ function [a_res, t_res, omega_LR] = LR_model(omegaB,omegaL, alpha, terminate_T)
     t_res = 10*(t - T);
     a_res = ab(:,1);
     omega_LR = H_T .* sqrt(omegaL) .* ab(:,2) ./ a_res;
+end
+
+function [a_res, t_res, omega_LR] = LR_model(omegaB,omegaL, alpha, terminate_T)
+    global H_T t_end a0;
+    
+    [a_res,b_res,t_res] = runge_kutta(@(t, a, b)H_T * sqrt(omegaB/a + H_T * alpha * sqrt(omegaL)/a^2 * b + omegaL*a^2),...
+                                      @(t, a, b)a * exp(-H_T * sqrt(omegaL) * t),...
+                                      a0,0,0,...
+                                      t_end/10, a0/10, terminate_T);
+                                  
+    omega_LR = H_T .* sqrt(omegaL) .* b_res ./ a_res;
 end
 
 %%
