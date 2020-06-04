@@ -1,0 +1,122 @@
+%% Differential equations
+% Here we define the differential equations used.
+% In both models, we use a $b$-function to solve for
+% $\Omega^{\Lambda R}_t$ with
+% 
+% $$\Omega^{\Lambda R}_t = \frac{H \sqrt{\Omega^{\Lambda}}}{a} b.$$
+% 
+% First the Friedmann
+% model.
+% 
+% $$\dot{a} = H_T \sqrt{\frac{\Omega^{B+D}}{a} + a^2 \Omega^{\Lambda}}$$
+% 
+% $$\dot{b} = a e^{-H_T \sqrt{\Omega^{\Lambda}} t}$$
+% 
+% Matlab uses single vector to represent $a$ and $b$, so
+% in the code, |ab(1)| is $a$ and |ab(2)| is $b$.
+
+function res = diff_eq_F(t,ab,BD,L)
+    global H_T
+    res = [H_T * sqrt(BD/ab(1) + L*ab(1)^2)
+           ab(1) * exp(-H_T * sqrt(L) * t)];
+end
+
+%%
+% Next, $\Lambda R$-model,
+% 
+% $$\dot{a} = H_T \sqrt{\frac{\Omega^{B+D}}{a} + \frac{\alpha H_T \sqrt{\Omega^{\Lambda}}}{a^3} b + a^2 \Omega^{\Lambda}}$$
+% 
+% $$\dot{b} = a e^{-H_T \sqrt{\Omega^{\Lambda}} t}$$
+% 
+function res = diff_eq_E(t,ab,BD,L,alpha)
+    global H_T
+    res = [H_T * sqrt(BD/ab(1) + H_T * alpha * sqrt(L)/ab(1)^2 * ab(2) + L*ab(1)^2)
+           ab(1) * exp(-H_T * sqrt(L) * t)];
+end
+
+%% Differential equation solvers
+% We use Matlab's ode45 -algorithm. We solve the equations with time unit
+% 10 Gyrs, and the unit conversion to Gyrs is done after that.
+% As above, |ab(:,1)| is $a$, |ab(:,2)| is $b$, and we solve
+% $\Omega^{\Lambda R}_t$ with
+% 
+% $$\Omega^{\Lambda R}_t = \frac{H \sqrt{\Omega^{\Lambda}}}{a} b.$$
+
+function [a_res, t_res, omega_LR] = F_model2(omegaBD,omegaL, terminate_T)
+    % Load global variables
+    global H_T t_end a0;
+    
+    % Some options regarding accuracy and the point a(T) == 1
+    options = odeset('Events',@(t,y)eventFunction(t,y,terminate_T),...
+                     'MaxStep',a0^(1/6),...
+                     'InitialStep',a0/8,...
+                     'RelTol',a0^0.6);
+                 
+    % Run the solver
+    [t,ab,T,~,~] = ode45(@(t,ab)diff_eq_F(t,ab,omegaBD,omegaL),...
+                         [0, t_end/10],... % integration area
+                         [a0,0],... % initial values for a and b
+                         options); % load options set above
+    
+    % Alert the user if solver didn't reach a(T) == 1
+    if isempty(T)
+        disp(['t_end is too small, so that a(T) = 1 is not reached.'...
+            'Increase the value in parameter listing.'...
+            'You can also try to increase accuracy.'])
+    end
+    
+    % Set T = 0 and do a unit conversion
+    t_res = 10*(t - T);
+    
+    % Final values
+    a_res = ab(:,1);
+    omega_LR = H_T .* sqrt(omegaL) .* ab(:,2) ./ a_res;
+end
+
+function [a_res, t_res, omega_LR] = F_model(omegaBD,omegaL, terminate_T)
+    global H_T t_end a0;
+    
+    [a_res,b_res,t_res] = runge_kutta(@(t, a, b)H_T * sqrt(omegaBD/a + omegaL*a^2),...
+                                      @(t, a, b)a * exp(-H_T * sqrt(omegaL) * t),...
+                                      a0,...
+                                      t_end/10, a0/10, terminate_T);
+                                  
+    omega_LR = H_T .* sqrt(omegaL) .* b_res ./ a_res;
+end
+
+%%
+% Very similar to Friedmann algrorithm. See comments above.
+function [a_res, t_res, omega_LR] = LR_model2(omegaB,omegaL, alpha, terminate_T)
+    global H_T t_end a0;
+    options = odeset('Events',@(t,ab)eventFunction(t,ab,terminate_T),...
+                     'MaxStep',a0^(1/6),...
+                     'InitialStep',a0/8,...
+                     'RelTol',a0^0.6);
+                 
+    % For some reason the solver gets stuck when omegaB == 0.
+    % That's why we start with a small initial b, when omegaB == 0.
+    % When omegaB ~= 0 our initial b is 0.
+    
+    [t,ab,T,~,~] = ode45(@(t,ab)diff_eq_E(t,ab,omegaB,omegaL,alpha),...
+                         [0, t_end/10],... % integration area
+                         [a0; (omegaB == 0)*a0/100],... % initial values for a and b
+                         options); % load options set above
+    
+    if isempty(T)
+        disp(['t_end is too small, so that a(T) = 1 is not reached.'...
+              'Increase the value in parameter listing.'...
+              'You can also try to increase accuracy.'])
+    end
+    t_res = 10*(t - T);
+    a_res = ab(:,1);
+    omega_LR = H_T .* sqrt(omegaL) .* ab(:,2) ./ a_res;
+end
+
+%%
+% An event function for ode45-algorithm. With this function we record the event , and % possibly stop the integration when that point is reached.
+
+function [position,isterminal,direction] = eventFunction(t,y,terminate_T)
+    position = y(1) - 1; % The value that we want to be zero
+    isterminal = terminate_T;  % Halt integration at the event
+    direction = 0;   % The event can be approached from either direction
+end
