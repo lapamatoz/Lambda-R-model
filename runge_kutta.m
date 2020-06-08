@@ -6,10 +6,10 @@ function [a, b, t_converted] = runge_kutta(a_dot, b_dot, ...
 % 
 % The algorithm is designed to solve differential equation, where derivative 
 % $\dot{a}$ is close to beign singular at initial time, and almost a constant 
-% further in time. With this kind of problem, the algorithm produces more precise 
-% results that Matlab's own |ode45| -algorithm. This is because of cubicly increasing 
-% step size. The algorithm also solves the event $a(T)=1$ more precisely than 
-% Matlab's event-feature can produce.
+% further in time, like Friedmann differential equation. With this kind of problem, 
+% the algorithm produces more precise results that Matlab's own |ode45| -algorithm. 
+% This is because of cubicly increasing step size. The algorithm also solves the 
+% event $a(T)=1$ more precisely than Matlab's event-feature can produce.
 % 
 % Algorithm integrates from $t_1=0$, but instead of returning $\bf{t}$, a converted 
 % array $10({\bf t}-T)$ is returned.
@@ -27,7 +27,7 @@ function [a, b, t_converted] = runge_kutta(a_dot, b_dot, ...
 % The algorithm has three phases: integration until $a_p>1$, solving for the 
 % point $a(T)=1$, and finally integrating from $T$ to $t_n$. The last phase might 
 % not be run, depending on |terminate_T|.
-                                 a_0, t_n, initial_step, terminate_T)
+                                 a_0, t_n, initial_step, terminate_T, findMax)
 %% 
 % Let's calculate the number of steps; Matlab can work with arrays that increase 
 % in size at every iteration, but the code will run faster if we initialize the 
@@ -93,6 +93,9 @@ end
 % this is equivelant to any of these equations beign true,
 % 
 % $a'_{k-1}-a'_k = 0$,        $a'_k-1=0$,        $h'_{k-1} - h'_k = 0$.
+% 
+% With Friedmann differential equation typically only 6-7 steps is needed, due 
+% to its almost linear shape at $a(T)=1$.
 % Initial values for the secant method
 h_k = [0, h];
 a_k = [a(p-1), a(p)];
@@ -141,6 +144,44 @@ else
         
         % Increment p
         p = p+1;
+    end
+end
+%% 
+% 
+%% Finding max
+if findMax
+    q = 1;
+    while b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q) > 0 && q < length(a)
+        q = q+1;
+    end
+    
+    % Initial values for the secant method
+    h_k = [0, (q-1)^3 * initial_step];
+    f_k = [b_dot(t(q-1), a(q-1), b(q-1)) * a(q-1) - a_dot(t(q-1), a(q-1), b(q-1)) * b(q-1),...
+            b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q)];
+    
+    % 100 step limit for the secant method
+    for k = 1:100
+        
+        % Conditions for breaking the loop
+        if f_k(2) == 0 || h_k(1) - h_k(2) == 0 || f_k(1) - f_k(2) == 0
+            break;
+        else
+            
+            % Evaluate new step size with previous iteration with secant equation
+            h_new = h_k(2) - ...
+                (b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q)) * (h_k(1)-h_k(2)) / (f_k(1)-f_k(2));
+            
+            f_k(1) = f_k(2);
+            h_k(1) = h_k(2);
+            
+            % Calculate new point with RK4
+            [a(q), b(q), t(q)] =...
+                    next_point(a_dot, b_dot, a(q-1), b(q-1), t(q-1), h_new);
+                
+            h_k(2) = h_new;
+            
+        end
     end
 end
 %% 
