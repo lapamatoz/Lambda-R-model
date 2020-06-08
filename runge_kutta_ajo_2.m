@@ -16,7 +16,7 @@ global H_T; H_T = 0.6715 * 1.0226;
 % Precision value: smaller gives more precise result. This single value affects 
 % various tolerance values in different algorithms.
 
-global a0; a0 = 10^-3;
+global a0; a0 = 10^-6;
 %% 
 % Maximum t-value for differential equation solver, in giga years and starting 
 % from the big bang. In some cases it is wanted that the solver is terminated 
@@ -29,20 +29,32 @@ global t_end; t_end = 69;
 % solved from equation $\Omega^{B} + \Omega^{\Lambda} + \Omega^{\Lambda R}_T = 
 % 1$. Function for |solve_omegaL| is provided later.
 
-global F_omegaB;  F_omegaB  = 0.049;
-global F_omegaD;  F_omegaD  = 0.268;
-global F_omegaL;  F_omegaL  = 0.683;
-global LR_omegaB; LR_omegaB = F_omegaB;
-global LR_omegaL; LR_omegaL = solve_omegaL(LR_omegaB,1);
+global omegaB;    omegaB    = 0.049;
+
+global FH_omegaD; FH_omegaD = 0.268;
+global FH_omegaL; FH_omegaL = 0.683;
+
+global F_omegaD;  F_omegaD  = 0.151;
+global F_omegaL;  F_omegaL  = 0.8;
+
+global LR_omegaL; LR_omegaL = solve_omegaL(omegaB,1);
+
+[~, tH, ~] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+global planckTime; planckTime = -tH(1);
 %% 
 % Parameters at which $\Omega^{\Lambda R}_T$ is maximised.
 
-global omega_LR_opt
-global omega_B_opt
-global omega_L_opt
+global omegaLR_opt
+global omegaB_opt
+global omegaL_opt
 
-[omega_LR_opt, omega_B_opt, omega_L_opt] = solve_optimum();
-%disp(legend_text('Optimal parameters', omega_LR_opt, NaN, omega_B_opt, omega_L_opt, NaN, NaN))
+[omegaLR_opt, omegaB_opt, omegaL_opt] = solve_optimum();
+%disp(legend_text('Optimal parameters', omegaLR_opt, NaN, omegaB_opt, omegaL_opt, NaN, NaN))
+
+global omegaD_opt
+global alpha_opt
+
+[omegaD_opt, alpha_opt] = optimizeDalpha();
 %% 
 % Some plot related variables.
 
@@ -53,9 +65,78 @@ global green; green = [ 24, 185,  50]/255;
 
 % Line width in plots
 global lineWidth; lineWidth = 1;
+
+% Matlab doesn't round results in console
+format long
 %% Calling the Plotting Functions
 % Here you can select which Figures you want to plot. Comment out the ones that 
 % you don't want to plot.
+
+
+%target = omegaLR_opt/omegaB_opt;
+%D = 0.260;
+%alpha = 0.037;
+%[aH, tH, omega_LRH] = F_model(0.317, 0.683, true, false);
+%L = solve_omegaL(0.049+D, alpha);
+%[a1, t1, omega_LR1] = LR_model(0.049 + D, L, alpha, true, false);
+%plot(tH,aH)
+%hold on
+%plot(t1,a1)
+%figure;
+%t = linspace(min([t1; tH]), 0, 200)
+%diff = arrayfun(@(value)difference(value,t1,a1,tH,aH), t)
+%plot(t,diff);
+%(D + alpha*omega_LR1(end)) / 0.049
+
+
+%D = linspace(0.25,0.27,20);
+%alpha = linspace(0,1,20);
+%timeMat = zeros(length(D),length(alpha));
+%valueMat = zeros(length(D),length(alpha));
+%for d = 1:length(D)
+%    timeMat(d,:) = arrayfun(@(alpha)targetTime(alpha,D(d)),alpha);
+%    valueMat(d,:) = arrayfun(@(alpha)targetVal(alpha,D(d)),alpha);
+%end
+%figure;
+%contourf(D,alpha,timeMat.')
+%colorbar
+%figure;
+%contourf(D,alpha,valueMat.')
+%colorbar
+% opt = optimset('TolFun',a0);
+
+%Dzero = fzero(@(D)fzero(@(alpha)targetVal(alpha,D),0.08317, opt) - fzero(@(alpha)targetTime(alpha,D),0.08317, opt), 0.2589, opt)
+%alphaZero = fzero(@(alpha)targetVal(alpha,Dzero),0.08317, opt)
+%targetVal(alphaZero,Dzero)
+%targetTime(alphaZero,Dzero)
+%Dzero = 0.258900004532476;
+%alphaZero = 0.083174748357469;
+
+% target = omegaLR_opt/omegaB_opt;
+% D = Dzero;
+% alpha = alphaZero;
+% [aH, tH, omega_LRH] = F_model(0.317, 0.683, true, false);
+% L = solve_omegaL(0.049+D, alpha);
+% [a1, t1, omega_LR1] = LR_model(0.049 + D, L, alpha, true, false);
+% 
+% omega_LR1(end)*alphaZero
+% 
+% plot(tH,aH)
+% hold on
+% plot(t1,a1)
+% hold off;
+% figure;
+% t = linspace(min([t1; tH])+1e-5, 0, 300)
+% diff = arrayfun(@(value)difference(value,t1,a1,tH,aH), t)
+% plot(t,abs(diff), 'LineWidth',1);
+% hold on
+% diffRel = arrayfun(@(value)differenceRel(value,t1,a1,tH,aH), t)
+% plot(t,abs(diffRel), 'LineWidth',1);
+% leg = legend('Absolute error','Relative error')
+% save_plot('error_plot', leg)
+
+%%
+
 
 %[a_res, t_res, omega_LR] = LR_model(1,0, 1,true);
 %disp(-t_res(1) - 9.70860731629968)
@@ -76,13 +157,36 @@ global lineWidth; lineWidth = 1;
 %final_plot_many_B()
 
 % Figure 6 / 19 yhtälö 25
-%[omegaB, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
-%print_table_two_col([omegaB,omegaLR,omegaL,T], [4 4 4 3])
-%print_table_two_col([omegaB, omegaLR_lin, omegaL_lin], [4 4 4])
+%[omegaB_array, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
+%print_table_two_col([omegaB_array,omegaLR,omegaL,T], [4 4 4 3])
+%print_table_two_col([omegaB_array, omegaLR_lin, omegaL_lin], [4 4 4])
 
 % Figure 8
 figure_8()
-%figure_9()
+figure_9()
+%plot_optimum()
+%plot_optimum_error()
+
+%%
+function value = targetVal(alpha,omegaD)
+    global omegaLR_opt omegaB_opt
+    global omegaB
+    omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    [~, ~, omega_LR1] = LR_model(omegaB + omegaD, omegaL, alpha, true, false);
+    value = (omegaD + alpha*omega_LR1(end)) / omegaB - omegaLR_opt/omegaB_opt;
+end
+
+function value = targetTime(alpha,D)
+    global planckTime
+    global omegaB
+    %disp(["D: ", num2str(D)])
+    %disp(["al: ", num2str(alpha)])
+    L = solve_omegaL(omegaB+D, alpha);
+    [~, t, ~] = LR_model(omegaB + D, L, alpha, true, false);
+    value = t(1) + planckTime;
+    %disp(value)
+end
+
 %% Differential Equation Solvers
 % Let's start with equations
 % 
@@ -211,6 +315,22 @@ function [omegaLR, omegaB, omegaL] = solve_optimum()
     omegaLR = -omegaLRneg;
     omegaL = 1 - omegaB - omegaLR;
 end
+%% 
+% Solver for optimal D and alpha.
+
+function [omegaD_opt, alpha_opt] = optimizeDalpha()
+    global a0
+    
+    opt = optimoptions('fsolve','FunctionTolerance', a0,'StepTolerance',a0, 'MaxFunctionEvaluations', 1e5, 'Display', 'off');
+    
+    x = fsolve(@(x)object(x),[0.26,0.083], opt);
+    omegaD_opt = x(1);
+    alpha_opt = x(2);
+    function F = object(x)
+        F(1) = targetVal(x(2),x(1));
+        F(2) = targetTime(x(2),x(1));
+    end
+end
 %% Tools for plotting
 % This section contains some general functions for plotting.
 % 
@@ -324,8 +444,9 @@ function final_plot_1()
     figure; hold on;
     
     % Load global variables
-    global F_omegaB F_omegaD F_omegaL
-    global LR_omegaB LR_omegaL
+    global omegaB FH_omegaD FH_omegaL
+    global F_omegaD F_omegaL
+    global LR_omegaL
     global red blue lineWidth
     
     % We only need to plot functions until a(T) = 1,
@@ -337,24 +458,22 @@ function final_plot_1()
     alpha = 1;
     
     % Run the Friedmann model
-    [aH, tH, omega_LRH] = F_model(F_omegaB + F_omegaD, F_omegaL, terminate_T, findMax);
+    [aH, tH, omega_LRH] = F_model(omegaB + FH_omegaD, FH_omegaL, terminate_T, findMax);
     pH = plot(tH, aH, '-', 'LineWidth', lineWidth, 'Color', red);
     
-    F0_omegaL = 0.8;
-    F0_omegaBD = 0.2;
     % Run the Friedmann model
-    [a0, t0, omega_LR0] = F_model(F0_omegaBD, F0_omegaL, terminate_T, findMax);
+    [a0, t0, omega_LR0] = F_model(omegaB + F_omegaD, F_omegaL, terminate_T, findMax);
     p0 = plot(t0, a0, '--', 'LineWidth', lineWidth, 'Color', 'k');
     
     % Run the ΛR-model
-    [a1, t1, omega_LR1] = LR_model(LR_omegaB, LR_omegaL, alpha, terminate_T, findMax);
+    [a1, t1, omega_LR1] = LR_model(omegaB, LR_omegaL, alpha, terminate_T, findMax);
     p1 = plot(t1, a1, '-.', 'LineWidth', lineWidth, 'Color', blue);
     
     % Set plot legend
     leg = legend([pH p0 p1],...
-        {legend_text('F-model (Planck data)',  omega_LRH(end), -tH(1), F_omegaB,  F_omegaD, NaN, F_omegaL, 'B,D', ''), ...
-         legend_text('F-model',  omega_LR0(end), -t0(1), F_omegaB,  F0_omegaBD - F_omegaB, NaN, F0_omegaL, 'BD', ''), ...
-         legend_text('ΛR-model', omega_LR1(end), -t1(1), LR_omegaB, NaN,      NaN, LR_omegaL, 'B', '')},...
+        {legend_text('F-model (Planck data)',  omega_LRH(end), -tH(1), omegaB,  FH_omegaD, NaN, FH_omegaL, 'B,D', ''), ...
+         legend_text('F-model',  omega_LR0(end), -t0(1), omegaB,  F_omegaD, NaN, F_omegaL, 'BD', ''), ...
+         legend_text('ΛR-model', omega_LR1(end), -t1(1), omegaB, NaN,      NaN, LR_omegaL, 'B', '')},...
         'Location',...
         'northwest');
     
@@ -372,8 +491,8 @@ function final_plot_50()
     figure; hold on;
     
     global H_T
-    global F_omegaB F_omegaD F_omegaL
-    global LR_omegaB LR_omegaL
+    global omegaB FH_omegaD FH_omegaL
+    global LR_omegaL
     global red blue lineWidth
     
     % Create t-axis points for f and g
@@ -391,17 +510,17 @@ function final_plot_50()
     findMax = false;
     
     % F-model
-    [a0, t0, ~] = F_model(F_omegaB + F_omegaD, F_omegaL, false, findMax);
+    [a0, t0, ~] = F_model(omegaB + FH_omegaD, FH_omegaL, false, findMax);
     p0 = plot(t0, a0, '-', 'LineWidth', lineWidth, 'Color', red);
     
     % ΛR-model
-    [a1, t1, ~] = LR_model(LR_omegaB, LR_omegaL, alpha, false, findMax);
+    [a1, t1, ~] = LR_model(omegaB, LR_omegaL, alpha, false, findMax);
     p1 = plot(t1, a1, '-.', 'LineWidth', lineWidth, 'Color', blue);
     
     % Add legend to the plot
     leg = legend([p0 p1],...
-        {legend_text('F-model', NaN,-t0(1),F_omegaB,F_omegaD,NaN,F_omegaL, 'BD', '') ...
-         legend_text('ΛR-model',NaN,-t1(1),LR_omegaB, NaN,NaN, LR_omegaL, 'B' , '')},...
+        {legend_text('F-model (Planck data)', NaN,-t0(1),omegaB,FH_omegaD,NaN,FH_omegaL, 'BD', '') ...
+         legend_text('ΛR-model',NaN,-t1(1),omegaB, NaN,NaN, LR_omegaL, 'B' , '')},...
         'Location',...
         'northwest');
     
@@ -422,23 +541,23 @@ end
 function final_plot_3()
     figure; hold on;
     
-    global F_omegaB F_omegaD F_omegaL
-    global LR_omegaB LR_omegaL
+    global omegaB FH_omegaD FH_omegaL
+    global LR_omegaL
     global red blue lineWidth
     
     % Go pass the point a(T) == 1
     terminate_T = false;
     
     % Friedmann
-    D0 = 1-LR_omegaL-F_omegaB;
-    [~,t0,omega_LR0] = F_model(F_omegaB + D0, LR_omegaL, terminate_T, true);
+    D0 = 1-LR_omegaL-omegaB;
+    [~,t0,omega_LR0] = F_model(omegaB + D0, LR_omegaL, terminate_T, true);
     p0 = plot(t0, omega_LR0, '-', 'Color', red, 'LineWidth', lineWidth);
     
     % ΛR-model alpha = 1
     alpha = 1;
     
     % ΛR-model
-    [~, t1, omega_LR1] = LR_model(LR_omegaB, LR_omegaL, alpha, terminate_T, true);
+    [~, t1, omega_LR1] = LR_model(omegaB, LR_omegaL, alpha, terminate_T, true);
     p1 = plot(t1, omega_LR1, '-.', 'Color', blue, 'LineWidth', lineWidth);
     
     [F_max_omega_LR, ind0] = max(omega_LR0);
@@ -447,9 +566,6 @@ function final_plot_3()
     F_max_t = t0(ind0);
     LR_max_t = t1(ind1);
     
-    disp(F_max_t)
-    disp(LR_max_t)
-    
     drawPointer(print_num(F_max_omega_LR,4),[F_max_t, 30.3],[F_max_omega_LR,F_max_omega_LR],[0,0],'left',red)
     drawPointer(print_num(LR_max_omega_LR,4),[LR_max_t, 30.3],[LR_max_omega_LR,LR_max_omega_LR],[0,0],'left',blue)
     
@@ -457,8 +573,8 @@ function final_plot_3()
     drawPointer(print_num(LR_max_t,4),[LR_max_t, LR_max_t],[LR_max_omega_LR,0.094],[0,-0.006],'left',blue)
     
     leg = legend([p0, p1],...
-            {legend_text('Ω^{ΛR}(t) along F-model trajectory', NaN, NaN, F_omegaB,  F_omegaD, NaN, LR_omegaL, '', '') ...
-             legend_text('Ω^{ΛR}(t)',NaN, NaN, LR_omegaB, NaN, NaN, LR_omegaL, '', '')},...
+            {legend_text('Ω^{ΛR}(t) along F-model trajectory', NaN, NaN, omegaB,  FH_omegaD, NaN, LR_omegaL, '', '') ...
+             legend_text('Ω^{ΛR}(t)',NaN, NaN, omegaB, NaN, NaN, LR_omegaL, '', '')},...
              'Location',...
              'southeast');
     
@@ -469,9 +585,9 @@ function final_plot_3()
     [~, LR_xAxisIntersect] = min(abs(t1));
     
     % Solve for the omegaLR_T and draw the values on the plot
-    %[~,~,omegaLR] = LR_model(LR_omegaB, LR_omegaL, 1, true, false);
+    %[~,~,omegaLR] = LR_model(omegaB, LR_omegaL, 1, true, false);
     draw_x_value('', omega_LR1(LR_xAxisIntersect), -12, 0, blue,-textOffset)
-    %[~,~,omegaLR] = F_model(F_omegaB + F_omegaD, F_omegaL, true, false);
+    %[~,~,omegaLR] = F_model(omegaB + FH_omegaD, F_omegaL, true, false);
     draw_x_value('', omega_LR0(F_xAxisIntersect), -12, 0, red, textOffset)
     
     
@@ -507,40 +623,40 @@ end
 function final_plot_4()
     figure; hold on;
     
-    global F_omegaB
-    global LR_omegaB LR_omegaL
-    global omega_LR_opt
+    global omegaB
+    global omegaB LR_omegaL
+    global omegaLR_opt
     global blue lineWidth
     
     findMax = false;
     
     % ΛR-model
-    D1 = 0.2 - LR_omegaB;
-    alpha1 = solve_alpha(LR_omegaB, D1, LR_omegaL);
-    [a_res, t_res1, omega_LR1] = LR_model(LR_omegaB+D1, LR_omegaL, alpha1,true, findMax);
+    D1 = 0.2 - omegaB;
+    alpha1 = solve_alpha(omegaB, D1, LR_omegaL);
+    [a_res, t_res1, omega_LR1] = LR_model(omegaB+D1, LR_omegaL, alpha1,true, findMax);
     p1 = plot(t_res1, a_res, ':','LineWidth',lineWidth,'Color',blue);
     
     % ΛR-model
-    D2 = 0.27 - LR_omegaB;
-    alpha2 = solve_alpha(LR_omegaB, D2, LR_omegaL);
-    [a_res, t_res2, omega_LR2] = LR_model(LR_omegaB+D2, LR_omegaL, alpha2,true, findMax);
+    D2 = 0.27 - omegaB;
+    alpha2 = solve_alpha(omegaB, D2, LR_omegaL);
+    [a_res, t_res2, omega_LR2] = LR_model(omegaB+D2, LR_omegaL, alpha2,true, findMax);
     p2 = plot(t_res2, a_res, '-.','LineWidth',lineWidth,'Color',blue);
     
     % ΛR-model
-    D3 = 0.3 - LR_omegaB;
-    alpha3 = solve_alpha(LR_omegaB, D3, LR_omegaL);
-    [a_res, t_res3, omega_LR3] = LR_model(LR_omegaB+D3, LR_omegaL, alpha3,true, findMax);
+    D3 = 0.3 - omegaB;
+    alpha3 = solve_alpha(omegaB, D3, LR_omegaL);
+    [a_res, t_res3, omega_LR3] = LR_model(omegaB+D3, LR_omegaL, alpha3,true, findMax);
     p3 = plot(t_res3, a_res, '--','LineWidth',lineWidth,'Color',blue);
     
     % F-model
-    [a_res, t_res0, omega_LR0] = F_model(F_omegaB + omega_LR_opt, LR_omegaL, true, findMax);
+    [a_res, t_res0, omega_LR0] = F_model(omegaB + omegaLR_opt, LR_omegaL, true, findMax);
     p0 = plot(t_res0, a_res,'-','LineWidth',lineWidth,'Color','k');
     
     leg = legend([p0 p3 p2 p1],...
-        {legend_text('F-model',  omega_LR0(end),-t_res0(1),F_omegaB, omega_LR_opt, NaN, LR_omegaL, 'B,D', ''), ...
-         legend_text('ΛR-model', omega_LR3(end),-t_res3(1),LR_omegaB, D3,alpha3, LR_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR2(end),-t_res2(1),LR_omegaB, D2,alpha2, LR_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR1(end),-t_res1(1),LR_omegaB, D1,alpha1, LR_omegaL, 'B,D', 'a,aR')},...
+        {legend_text('F-model',  omega_LR0(end),-t_res0(1),omegaB, omegaLR_opt, NaN, LR_omegaL, 'B,D', ''), ...
+         legend_text('ΛR-model', omega_LR3(end),-t_res3(1),omegaB, D3,alpha3, LR_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR2(end),-t_res2(1),omegaB, D2,alpha2, LR_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR1(end),-t_res1(1),omegaB, D1,alpha1, LR_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northwest');
     
@@ -556,7 +672,7 @@ end
 function final_plot_many_B()
     figure; hold on;
     
-    global omega_B_opt
+    global omegaB_opt
     global red blue
     
     drawNewB(0,red,':',true);
@@ -567,7 +683,7 @@ function final_plot_many_B()
     drawNewB(0.4,blue,':',true);
     drawNewB(0.8,blue,':',true);
 
-    drawNewB(omega_B_opt,'k','-',true);
+    drawNewB(omegaB_opt,'k','-',true);
     xlabel('Time {\itt} in Gyr'); ylabel('Ω^{ΛR}({\itt})')
     title(['Figure 5, ', print_today()])
     axis([-20 50 0 0.3])
@@ -606,11 +722,11 @@ end
 function [omegaB_table, omegaLR_table, omegaL_table, T_table, omegaLR_table_lin, omegaL_table_lin] = final_plot_RB()
     figure; hold on;
     
-    global omega_B_opt LR_omegaB
+    global omegaB_opt omegaB
     global red green blue lineWidth
     
     % Create a vector for values of Ω^B, which we want to put in a table
-    omegaB_table = [0:0.01:0.04, 0.042, omega_B_opt, LR_omegaB, 0.05, 0.06:0.01:0.1, 0.12:0.02:0.9, 0.91:0.01:1].';
+    omegaB_table = [0:0.01:0.04, 0.042, omegaB_opt, omegaB, 0.05, 0.06:0.01:0.1, 0.12:0.02:0.9, 0.91:0.01:1].';
     
     % Add some points for the plot. We'll merge this vector with the
     % values for the table
@@ -630,13 +746,13 @@ function [omegaB_table, omegaLR_table, omegaL_table, T_table, omegaLR_table_lin,
     p2 = plot(omegaB_plot,omegaLR_plot_lin, '--', 'Color', 'k', 'LineWidth', lineWidth);
     p1 = plot(omegaB_plot,omegaLR_plot,     '-',  'Color', blue, 'LineWidth', lineWidth);
     
-    % Find indices of Bopt and LR_omegaB
-    %[~, ind] =    min(abs(LR_omegaB   - omegaB_plot));
-    [~, indOpt] = min(abs(omega_B_opt - omegaB_plot));
+    % Find indices of Bopt and omegaB
+    %[~, ind] =    min(abs(omegaB   - omegaB_plot));
+    [~, indOpt] = min(abs(omegaB_opt - omegaB_plot));
     [~, indOptLeft] = min(abs(0.042 - omegaB_plot));
     [~, indOptRight] = min(abs(0.05 - omegaB_plot));
     
-    % Draw red x at Bopt and LR_omegaB
+    % Draw red x at Bopt and omegaB
     plot(omegaB_plot([indOptLeft, indOpt, indOptRight]), omegaLR_plot_lin([indOptLeft, indOpt, indOptRight]), '+', 'Color', red, 'LineWidth', lineWidth);
     plot(omegaB_plot([indOptLeft, indOpt, indOptRight]), omegaLR_plot([indOptLeft, indOpt, indOptRight]),     '+', 'Color', red, 'LineWidth', lineWidth);
     
@@ -676,8 +792,8 @@ end
 
 function figure_8()
     figure; hold on;
-    global F_omegaB F_omegaD
-    global LR_omegaB LR_omegaL
+    global omegaB FH_omegaD
+    global omegaB LR_omegaL
     global red blue lineWidth
     
     terminate_T = true;
@@ -707,22 +823,21 @@ function figure_8()
     [a4, t4, omega_LR4] = LR_model(LR4_omegaBD, LR4_omegaL, LR4_alpha, terminate_T, findMax);
     p4 = plot(t4,a4,'--','LineWidth', lineWidth, 'Color', blue);
     
-    H_omegaBD = 0.317;
-    H_omegaL = 1-H_omegaBD;
-    [aH, tH, omega_LRH] = F_model(H_omegaBD, H_omegaL, terminate_T, findMax);
+    H_omegaL = 1-(omegaB+FH_omegaD);
+    [aH, tH, omega_LRH] = F_model((omegaB+FH_omegaD), H_omegaL, terminate_T, findMax);
     pH = plot(tH,aH ,'-','LineWidth', lineWidth, 'Color', red);
     
-    %F_omegaBD = 0.2;
-    %F_omegaL = 1-F_omegaBD;
-    %[a0, t0, omega_LR0] = F_model(F_omegaBD, F_omegaL, terminate_T, findMax);
+    %omegaBD = 0.2;
+    %F_omegaL = 1-omegaBD;
+    %[a0, t0, omega_LR0] = F_model(omegaBD, F_omegaL, terminate_T, findMax);
     %p0 = plot(t0,a0,'--','LineWidth', lineWidth, 'Color', red);
     
     leg = legend([pH p3 p4 p2 p1],...
-        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),F_omegaB, H_omegaBD-LR_omegaB,NaN, H_omegaL, 'B,D','a,aR'),...
-    legend_text('ΛR-model', omega_LR3(end),-t3(1),F_omegaB, LR3_omegaBD-LR_omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
-legend_text('ΛR-model', omega_LR4(end),-t4(1),F_omegaB, LR4_omegaBD-LR_omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR2(end),-t2(1),F_omegaB, LR2_omegaBD-LR_omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR1(end),-t1(1),F_omegaB, LR1_omegaBD-LR_omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR')},...
+        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D','a,aR'),...
+    legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
+legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northwest');
     xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
@@ -737,8 +852,8 @@ end
 
 function figure_9()
     figure; hold on;
-    global F_omegaB F_omegaD
-    global LR_omegaB LR_omegaL
+    global omegaB FH_omegaD
+    global omegaB LR_omegaL
     global red blue lineWidth
     
     terminate_T = true;
@@ -762,16 +877,15 @@ function figure_9()
     [a3, t3, omega_LR3] = LR_model(LR3_omegaBD, LR3_omegaL, LR3_alpha, terminate_T, findMax);
     p3 = plot(t3,a3,'-.','LineWidth', lineWidth, 'Color', blue);
     
-    H_omegaBD = 0.317;
-    H_omegaL = 1-H_omegaBD;
-    [aH, tH, omega_LRH] = F_model(H_omegaBD, H_omegaL, terminate_T, findMax);
+    H_omegaL = 1-(omegaB+FH_omegaD);
+    [aH, tH, omega_LRH] = F_model((omegaB+FH_omegaD), H_omegaL, terminate_T, findMax);
     pH = plot(tH,aH ,'LineWidth', lineWidth, 'Color', red);
     
     leg = legend([pH p1 p2 p3],...
-        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),F_omegaB, H_omegaBD-LR_omegaB,NaN, H_omegaL),...
-         legend_text('ΛR-model', omega_LR1(end),-t1(1),F_omegaB, LR1_omegaBD-LR_omegaB,LR1_alpha, LR1_omegaL),...
-         legend_text('ΛR-model', omega_LR2(end),-t2(1),F_omegaB, LR2_omegaBD-LR_omegaB,LR2_alpha, LR2_omegaL),...
-         legend_text('ΛR-model', omega_LR3(end),-t3(1),F_omegaB, LR3_omegaBD-LR_omegaB,LR3_alpha, LR3_omegaL)},...
+        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northwest');
     xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
@@ -780,4 +894,73 @@ function figure_9()
     daspect([1 0.1 1])
     draw_y_axis()
     save_plot('kuva_9', leg)
+end
+    
+%% Figure A
+
+function plot_optimum()
+    figure; hold on;
+    global omegaB FH_omegaD FH_omegaL
+    global omegaD_opt alpha_opt
+    global red blue lineWidth
+    
+    LR_omegaL = solve_omegaL(omegaB+omegaD_opt, alpha_opt);
+    [a1, t1, omega_LR] = LR_model(omegaB + omegaD_opt, LR_omegaL, alpha_opt, true, false);
+    p1 = plot(t1,a1,'-.','LineWidth', lineWidth, 'Color', blue);
+    
+    [aH, tH, omega_LRH] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+    pH = plot(tH,aH,'LineWidth', lineWidth, 'Color', red);
+
+    leg = legend([pH p1],...
+    {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, FH_omegaD,NaN, FH_omegaL,'B,D','a,aR'),...
+     legend_text('ΛR-model', omega_LR(end), -t1(1), omegaB, omegaD_opt, alpha_opt, LR_omegaL,'B,D','a,aR')},...
+    'Location',...
+    'northwest');
+    
+    save_plot('kuva_A', leg)
+end
+%% Figure B
+
+function plot_optimum_error()
+    figure; hold on;
+    global omegaB FH_omegaD FH_omegaL
+    global omegaD_opt alpha_opt
+    global red blue lineWidth
+    
+    LR_omegaL = solve_omegaL(omegaB+omegaD_opt, alpha_opt);
+    [a1, t1, ~] = LR_model(omegaB + omegaD_opt, LR_omegaL, alpha_opt, true, false);
+    
+    [aH, tH, ~] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+    t = linspace(t1(1) + 1e-2, 0, 300);
+    diff = arrayfun(@(value)difference(value,t1,a1,tH,aH), t);
+    plot(t,abs(diff),'-.','LineWidth', lineWidth, 'Color', blue);
+    diffRel = arrayfun(@(value)differenceRel(value,t1,a1,tH,aH), t);
+    plot(t,abs(diffRel),'-','LineWidth', lineWidth, 'Color', red);
+    leg = legend('Absolute error','Relative error');
+    save_plot('error_plot', leg);
+end
+
+function ind = nearestTwoPts(set,value)
+    [~, ind] = sort(abs(set-value));
+    ind = ind(1:2);
+end
+
+function d = differenceRel(value,X1,Y1,X2,Y2)
+    ind1 = nearestTwoPts(X1,value);
+    ind2 = nearestTwoPts(X2,value);
+    t1 = (value - X1(ind1(2))) / (X1(ind1(1)) - X1(ind1(2)));
+    t2 = (value - X2(ind2(2))) / (X2(ind2(1)) - X2(ind2(2)));
+    y1 = t1 * Y1(ind1(1)) + (1 - t1) * Y1(ind1(2));
+    y2 = t2 * Y2(ind2(1)) + (1 - t2) * Y2(ind2(2));
+    d = (max(0,y1)-max(0,y2))/y2;
+end
+
+function d = difference(value,X1,Y1,X2,Y2)
+    ind1 = nearestTwoPts(X1,value);
+    ind2 = nearestTwoPts(X2,value);
+    t1 = (value - X1(ind1(2))) / (X1(ind1(1)) - X1(ind1(2)));
+    t2 = (value - X2(ind2(2))) / (X2(ind2(1)) - X2(ind2(2)));
+    y1 = t1 * Y1(ind1(1)) + (1 - t1) * Y1(ind1(2));
+    y2 = t2 * Y2(ind2(1)) + (1 - t2) * Y2(ind2(2));
+    d = (max(0,y1)-max(0,y2));
 end
