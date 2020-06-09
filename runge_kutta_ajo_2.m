@@ -7,6 +7,10 @@
 % 
 % The functions have similar commands, so some of the code further down is not 
 % commented as well as the code above it.
+%% 
+% Close all open Figures
+
+close all
 %% Calculation Parameters and Global Variables
 % Here we declare global variables, First is Hubble constant, with correction 
 % factor, in unit (10 Gyr)^-1.
@@ -16,7 +20,7 @@ global H_T; H_T = 0.6715 * 1.0226;
 % Precision value: smaller gives more precise result. This single value affects 
 % various tolerance values in different algorithms.
 
-global a0; a0 = 10^-6;
+global a0; a0 = 10^-12;
 %% 
 % Maximum t-value for differential equation solver, in giga years and starting 
 % from the big bang. In some cases it is wanted that the solver is terminated 
@@ -72,72 +76,6 @@ format long
 % Here you can select which Figures you want to plot. Comment out the ones that 
 % you don't want to plot.
 
-
-%target = omegaLR_opt/omegaB_opt;
-%D = 0.260;
-%alpha = 0.037;
-%[aH, tH, omega_LRH] = F_model(0.317, 0.683, true, false);
-%L = solve_omegaL(0.049+D, alpha);
-%[a1, t1, omega_LR1] = LR_model(0.049 + D, L, alpha, true, false);
-%plot(tH,aH)
-%hold on
-%plot(t1,a1)
-%figure;
-%t = linspace(min([t1; tH]), 0, 200)
-%diff = arrayfun(@(value)difference(value,t1,a1,tH,aH), t)
-%plot(t,diff);
-%(D + alpha*omega_LR1(end)) / 0.049
-
-
-%D = linspace(0.25,0.27,20);
-%alpha = linspace(0,1,20);
-%timeMat = zeros(length(D),length(alpha));
-%valueMat = zeros(length(D),length(alpha));
-%for d = 1:length(D)
-%    timeMat(d,:) = arrayfun(@(alpha)targetTime(alpha,D(d)),alpha);
-%    valueMat(d,:) = arrayfun(@(alpha)targetVal(alpha,D(d)),alpha);
-%end
-%figure;
-%contourf(D,alpha,timeMat.')
-%colorbar
-%figure;
-%contourf(D,alpha,valueMat.')
-%colorbar
-% opt = optimset('TolFun',a0);
-
-%Dzero = fzero(@(D)fzero(@(alpha)targetVal(alpha,D),0.08317, opt) - fzero(@(alpha)targetTime(alpha,D),0.08317, opt), 0.2589, opt)
-%alphaZero = fzero(@(alpha)targetVal(alpha,Dzero),0.08317, opt)
-%targetVal(alphaZero,Dzero)
-%targetTime(alphaZero,Dzero)
-%Dzero = 0.258900004532476;
-%alphaZero = 0.083174748357469;
-
-% target = omegaLR_opt/omegaB_opt;
-% D = Dzero;
-% alpha = alphaZero;
-% [aH, tH, omega_LRH] = F_model(0.317, 0.683, true, false);
-% L = solve_omegaL(0.049+D, alpha);
-% [a1, t1, omega_LR1] = LR_model(0.049 + D, L, alpha, true, false);
-% 
-% omega_LR1(end)*alphaZero
-% 
-% plot(tH,aH)
-% hold on
-% plot(t1,a1)
-% hold off;
-% figure;
-% t = linspace(min([t1; tH])+1e-5, 0, 300)
-% diff = arrayfun(@(value)difference(value,t1,a1,tH,aH), t)
-% plot(t,abs(diff), 'LineWidth',1);
-% hold on
-% diffRel = arrayfun(@(value)differenceRel(value,t1,a1,tH,aH), t)
-% plot(t,abs(diffRel), 'LineWidth',1);
-% leg = legend('Absolute error','Relative error')
-% save_plot('error_plot', leg)
-
-%%
-
-
 %[a_res, t_res, omega_LR] = LR_model(1,0, 1,true);
 %disp(-t_res(1) - 9.70860731629968)
 
@@ -162,11 +100,12 @@ format long
 %print_table_two_col([omegaB_array, omegaLR_lin, omegaL_lin], [4 4 4])
 
 % Figure 8
-figure_8()
-figure_9()
+%figure_8()
+%figure_9()
 %plot_optimum()
 %plot_optimum_error()
 
+%plotEquationsDalpha()
 %%
 function value = targetVal(alpha,omegaD)
     global omegaLR_opt omegaB_opt
@@ -176,17 +115,26 @@ function value = targetVal(alpha,omegaD)
     value = (omegaD + alpha*omega_LR1(end)) / omegaB - omegaLR_opt/omegaB_opt;
 end
 
-function value = targetTime(alpha,D)
+function value = targetTime(alpha,omegaD)
     global planckTime
     global omegaB
     %disp(["D: ", num2str(D)])
     %disp(["al: ", num2str(alpha)])
-    L = solve_omegaL(omegaB+D, alpha);
-    [~, t, ~] = LR_model(omegaB + D, L, alpha, true, false);
+    omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    [~, t, ~] = LR_model(omegaB + omegaD, omegaL, alpha, true, false);
     value = t(1) + planckTime;
     %disp(value)
 end
 
+function values = targetValTime(omegaD, alpha)
+    global omegaLR_opt omegaB_opt
+    global omegaB
+    global planckTime
+    omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    [~, t, omega_LR] = LR_model(omegaB + omegaD, omegaL, alpha, true, false);
+    values(1) = (omegaD + alpha*omega_LR(end)) / omegaB - omegaLR_opt/omegaB_opt;
+    values(2) = t(1) + planckTime;
+end
 %% Differential Equation Solvers
 % Let's start with equations
 % 
@@ -316,20 +264,17 @@ function [omegaLR, omegaB, omegaL] = solve_optimum()
     omegaL = 1 - omegaB - omegaLR;
 end
 %% 
-% Solver for optimal D and alpha.
+% Solver for $\Omega^D$ and $\alpha$, such that age of the universe matches 
+% with the Friedmann model, $T=13.824 \ldots$, and $\Omega^D + \alpha \Omega^{\Lambda 
+% R}_T = \frac{\Omega^{\Lambda R}_{T,opt}}{\Omega^B_{opt}} \Omega^B = 0.28116 
+% \ldots$.
 
 function [omegaD_opt, alpha_opt] = optimizeDalpha()
     global a0
-    
     opt = optimoptions('fsolve','FunctionTolerance', a0,'StepTolerance',a0, 'MaxFunctionEvaluations', 1e5, 'Display', 'off');
-    
-    x = fsolve(@(x)object(x),[0.26,0.083], opt);
+    x = fsolve(@(x)targetValTime(x(1), x(2)),[0.26,0.083], opt);
     omegaD_opt = x(1);
     alpha_opt = x(2);
-    function F = object(x)
-        F(1) = targetVal(x(2),x(1));
-        F(2) = targetTime(x(2),x(1));
-    end
 end
 %% Tools for plotting
 % This section contains some general functions for plotting.
@@ -340,26 +285,18 @@ function res = print_num(x, n)
     %res = num2str(round(x,n,'significant'));
     res = num2str(round(x,n));
 end
-
-% Saves current plot to current directory. This function adds grid.
-% leg is legend object.
 %% 
 % Saves current plot to current directory. This function adds grid and shortens 
 % the legend's line samples. Variable |size| modifies text size. Smaller value 
 % corresponds to a bigger font size.
 
 function save_plot(name, leg)
-    size = 3.5;
+    figuresize(19.5, 11.96, 'cm')
     grid on
     if ~isa(leg, 'double')
         leg.ItemTokenSize = [15,9]; % default [30,18]
     end
-    set(gcf, 'Units', 'inches');
-    screenposition = get(gcf, 'Position');
-    set(gcf,...
-        'PaperPosition', [0 0 size*screenposition(3:4)],...
-        'PaperSize', size*screenposition(3:4));
-    print(name, '-dpdf', '-fillpage')
+    saveas(gcf, [name, '.pdf'])
 end
 %% 
 % Creates texts for legends. Input values |NaN|, are not printed.
@@ -478,7 +415,7 @@ function final_plot_1()
         'northwest');
     
     % Set title etc., and save the figure
-    title(['Figure 1 ', print_today()])
+    %title(['Figure 1 ', print_today()])
     xlabel('Time {\itt} in Gyr'); ylabel('Scale factor {\ita}({\itt})')
     axis([-18 1 0 1.1])
     daspect([1 0.1 1])
@@ -530,7 +467,7 @@ function final_plot_50()
     drawPointer(' {\itg}({\itt})',[tPoint,41],[exp(tPoint/10 * H_T * sqrt(LR_omegaL)),7],[0,0],'left','k')
     
     % Add title etc. and save the plot
-    title(['Figure 2 ', print_today()])
+    %title(['Figure 2 ', print_today()])
     xlabel('Time {\itt} in Gyr'); ylabel('Scale factor {\ita}({\itt})')
     draw_y_axis()
     axis([-20 50 0 20])
@@ -585,14 +522,11 @@ function final_plot_3()
     [~, LR_xAxisIntersect] = min(abs(t1));
     
     % Solve for the omegaLR_T and draw the values on the plot
-    %[~,~,omegaLR] = LR_model(omegaB, LR_omegaL, 1, true, false);
     draw_x_value('', omega_LR1(LR_xAxisIntersect), -12, 0, blue,-textOffset)
-    %[~,~,omegaLR] = F_model(omegaB + FH_omegaD, F_omegaL, true, false);
     draw_x_value('', omega_LR0(F_xAxisIntersect), -12, 0, red, textOffset)
     
     
     % Set title etc. and save the figure
-    title(['Figure 3 ', print_today()])
     xlabel('Time {\itt} in Gyr'); ylabel('Ω^{ΛR}({\itt})')
     axis([-20 50 0 0.3])
     draw_y_axis()
@@ -660,9 +594,8 @@ function final_plot_4()
         'Location',...
         'northwest');
     
-    title(['Figure 4 ', print_today()])
     xlabel('Time {\itt} in Gyr'); ylabel('Scale factor {\ita}({\itt})')
-    axis([-18 1 0 1.1])
+    axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
     save_plot('kuva_4', leg)
@@ -685,7 +618,6 @@ function final_plot_many_B()
 
     drawNewB(omegaB_opt,'k','-',true);
     xlabel('Time {\itt} in Gyr'); ylabel('Ω^{ΛR}({\itt})')
-    title(['Figure 5, ', print_today()])
     axis([-20 50 0 0.3])
     draw_y_axis()
     
@@ -764,7 +696,7 @@ function [omegaB_table, omegaLR_table, omegaL_table, T_table, omegaLR_table_lin,
     
     % Set title etc. and save the figure
     xlabel('Ω^{\itB}'); ylabel('Ω^{ΛR}_{\itT}')
-    title(['Figure 6, ', print_today()])
+    %title(['Figure 6, ', print_today()])
     save_plot('kuva_6', leg)
     
     % Let's create the table
@@ -841,8 +773,7 @@ legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_al
         'Location',...
         'northwest');
     xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
-    title(['Figure 8, ', print_today()])
-    axis([-18 1 0 1.1])
+    axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
     save_plot('kuva_8', leg)
@@ -889,13 +820,16 @@ function figure_9()
         'Location',...
         'northwest');
     xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
-    title(['Figure 9, ', print_today()])
-    axis([-18 1 0 1.1])
+    axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
+    %opacity = 0.3;
+    %p1.Color(4) = opacity;
+    %p2.Color(4) = opacity;
+    %p3.Color(4) = opacity;
+    %pH.Color(4) = opacity;
     save_plot('kuva_9', leg)
 end
-    
 %% Figure A
 
 function plot_optimum()
@@ -916,7 +850,10 @@ function plot_optimum()
      legend_text('ΛR-model', omega_LR(end), -t1(1), omegaB, omegaD_opt, alpha_opt, LR_omegaL,'B,D','a,aR')},...
     'Location',...
     'northwest');
-    
+    axis([-16 1 0 1.1])
+    daspect([1 0.1 1])
+    xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
+    draw_y_axis()
     save_plot('kuva_A', leg)
 end
 %% Figure B
@@ -937,6 +874,7 @@ function plot_optimum_error()
     diffRel = arrayfun(@(value)differenceRel(value,t1,a1,tH,aH), t);
     plot(t,abs(diffRel),'-','LineWidth', lineWidth, 'Color', red);
     leg = legend('Absolute error','Relative error');
+    xlabel('Time {\itt} in Gyr')
     save_plot('error_plot', leg);
 end
 
@@ -963,4 +901,23 @@ function d = difference(value,X1,Y1,X2,Y2)
     y1 = t1 * Y1(ind1(1)) + (1 - t1) * Y1(ind1(2));
     y2 = t2 * Y2(ind2(1)) + (1 - t2) * Y2(ind2(2));
     d = (max(0,y1)-max(0,y2));
+end
+%% Figure C
+
+function plotEquationsDalpha()
+    figure; hold on;
+    global lineWidth red blue a0
+    D_array = linspace(0.22, 0.3, ceil(-log10(a0)));
+    
+    opt = optimoptions('fsolve','FunctionTolerance', 1e-3,'StepTolerance',1e-3, 'MaxFunctionEvaluations', ceil(-log10(a0)), 'Display', 'off');
+    
+    valEq = arrayfun(@(D)fsolve(@(alpha)targetVal(alpha,D),1.050375-3.73625*D,opt), D_array);
+    timeEq = arrayfun(@(D)fsolve(@(alpha)targetTime(alpha,D),2.498425-9.25875*D,opt), D_array);
+    plot(D_array,valEq,'-','LineWidth', lineWidth, 'Color', red)
+    plot(D_array,timeEq,'--','LineWidth', lineWidth, 'Color', blue)
+    leg = legend('Ω^{\itD} + {\itα} Ω^{ΛR}_{\itT} = 0.2812','T = 13.824');
+    xlabel('Ω^{\itD}')
+    ylabel('{\itα}')
+    plot(xlim, [0 0], '-k', 'LineWidth',0.5,'HandleVisibility','off')
+    save_plot('equation_solutions',leg)
 end
