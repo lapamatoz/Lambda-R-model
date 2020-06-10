@@ -79,11 +79,13 @@ format long
 %[a_res, t_res, omega_LR] = LR_model(1,0, 1,true);
 %disp(-t_res(1) - 9.70860731629968)
 
+%legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, FH_omegaD,NaN, FH_omegaL,'B,D','a,aR')
+
 % Figure 1 / Fig 1
 %final_plot_1()
 
 % Figure 2 / Fig 3
-%final_plot_50()
+final_plot_50()
 
 % Figure 3 / Fig 4
 %final_plot_3()
@@ -96,12 +98,14 @@ format long
 
 % Figure 6 / 19 yhtälö 25
 %[omegaB_array, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
-%print_table_two_col([omegaB_array,omegaLR,omegaL,T], [4 4 4 3])
-%print_table_two_col([omegaB_array, omegaLR_lin, omegaL_lin], [4 4 4])
+%print_table_two_col([omegaB_array,omegaLR*1000,omegaL*1000,T], [4 4 4 5])
+%print_table_two_col([omegaB_array*100, omegaLR_lin*100, omegaL_lin*100], [2 2 2])
+
+%print_num_sig(0.0099,4)
 
 % Figure 8
 %figure_8()
-%figure_9()
+figure_9()
 %plot_optimum()
 %plot_optimum_error()
 
@@ -285,6 +289,26 @@ function res = print_num(x, n)
     %res = num2str(round(x,n,'significant'));
     res = num2str(round(x,n));
 end
+function res = print_num_sig(x, n)
+    if (x >= 0.01) && (x < 1000000)
+        %res = num2str(round(x,3), '%f3');
+        res = sprintf('%0.3f',round(x,3));
+        res = strrep(res,'e','E');
+    else
+        exponent = floor(log10(x));
+        %res = num2str(round(x/10^exponent,1));
+        res = sprintf('%0.1f',round(x/10^exponent,1));
+        if exponent > 0
+            res = [res, 'E+', num2str(exponent)];
+        else
+            res = [res, 'E', num2str(exponent)];
+        end
+    end
+end
+
+function res = print_num_sig2(x, n)
+    res = num2str(round(x,n,'significant'));
+end
 %% 
 % Saves current plot to current directory. This function adds grid and shortens 
 % the legend's line samples. Variable |size| modifies text size. Smaller value 
@@ -294,7 +318,7 @@ function save_plot(name, leg)
     figuresize(19.5, 11.96, 'cm')
     grid on
     if ~isa(leg, 'double')
-        leg.ItemTokenSize = [15,9]; % default [30,18]
+        leg.ItemTokenSize = [30,18]*0.60; % default [30,18]
     end
     saveas(gcf, [name, '.pdf'])
 end
@@ -304,28 +328,28 @@ end
 function res = legend_text(name,R,T,B,D,alpha,L,BDFormat,alphaLRFormat)
     res = [name ': '];
     if ~isnan(R) &&  (alphaLRFormat == "R"|| alphaLRFormat == "R,aR" || alphaLRFormat == "a,R" || alphaLRFormat == "a,R,aR")
-        res = [res 'Ω^{ΛR}_{\itT} = ' print_num(R,4) ', '];
+        res = [res 'Ω^{ΛR}_{\itT} = ' print_num_sig(R,4) ', '];
     end
     if ~isnan(B) && (BDFormat == "B"|| BDFormat == "B,D" || BDFormat == "B,BD" || BDFormat == "B,D,BD")
-        res = [res 'Ω^{\itB} = ' print_num(B,4) ', '];
+        res = [res 'Ω^{\itB} = ' print_num_sig(B,4) ', '];
     end
     if ~isnan(D) && (BDFormat == "D"|| BDFormat == "B,D" || BDFormat == "D,BD" || BDFormat == "B,D,BD")
-        res = [res 'Ω^{\itD} = ' print_num(D,4) ', '];
+        res = [res 'Ω^{\itD} = ' print_num_sig(D,4) ', '];
     end
     if ~isnan(B) && ~isnan(D) && (BDFormat == "BD"|| BDFormat == "B,BD" || BDFormat == "D,BD" || BDFormat == "B,D,BD")
-        res = [res 'Ω^{{\itB}+{\itD}} = ' print_num(B+D,4) ', '];
+        res = [res 'Ω^{{\itB}+{\itD}} = ' print_num_sig(B+D,4) ', '];
     end
     if ~isnan(alpha) && (alphaLRFormat == "a"|| alphaLRFormat == "a,aR" || alphaLRFormat == "a,R" || alphaLRFormat == "a,R,aR")
-        res = [res '{\itα} = ' print_num(alpha,4) ', '];
+        res = [res '{\itα} = ' print_num_sig(alpha,4) ', '];
     end
     if ~isnan(alpha) && ~isnan(R) && (alphaLRFormat == "aR"|| alphaLRFormat == "a,aR" || alphaLRFormat == "R,aR" || alphaLRFormat == "a,R,aR")
-        res = [res '{\itα}Ω^{ΛR}_{\itT} = ' print_num(alpha*R,4) ', '];
+        res = [res '{\itα}Ω^{ΛR}_{\itT} = ' print_num_sig(alpha*R,4) ', '];
     end
     if ~isnan(L)
-        res = [res 'Ω^Λ = ' print_num(L,4) ', '];
+        res = [res 'Ω^Λ = ' print_num_sig(L,4) ', '];
     end
     if ~isnan(T)
-        res = [res '{\itT} = ' print_num(T,3) ', '];
+        res = [res '{\itT} = ' print_num_sig(T,5) ', '];
     end
     res = res(1:end-2); % removes last ', '
 end
@@ -353,6 +377,7 @@ function print_table_two_col(matrix, precision)
     res = char(ones(length(matrix(:,1)),1) * ' ');
     
     for p = 1:(length(matrix(1,:))-1)
+        matrix(:,p)
         res = [res, print_num(matrix(:,p), precision(p)), et];
     end
     
@@ -460,18 +485,41 @@ function final_plot_50()
          legend_text('ΛR-model',NaN,-t1(1),omegaB, NaN,NaN, LR_omegaL, 'B' , '')},...
         'Location',...
         'northwest');
+    %tPoint = 33;
+    
+    
+    %drawPointer('{\itf}({\itt}) = exp(H_T {\itt}), {\itt} ≥ 0',[tPoint,27],[exp(tPoint/10 * H_T),11],[0,0],'right','k')
+    
+    %drawPointer(' {\itg}({\itt}) = exp(H_T √ ̅0̅.̅6̅8̅8̅1 {\itt}), {\itt} ≥ 0',[tPoint,23],[exp(tPoint/10 * H_T * sqrt(LR_omegaL)),2.5],[0,0],'left','k')
+    
+    tPoint = 22;
+    name = '$~g(t) = e^{H_T \sqrt{0.6881}\, t}, \hspace{0.6em} t \geq 0$';
+    color = 'k';
+    textPos = 'left';
+    textOffset = [0,0];
+    x = [tPoint,25];
+    y = [exp(tPoint/10 * H_T * sqrt(LR_omegaL)),3];
+    plot(x,y, 'Color', color, 'LineWidth',0.5,'HandleVisibility','off')
+    t = text(x(2)+textOffset(1),y(2)+textOffset(2),name,'HorizontalAlignment',textPos,'Rotation',0,'FontSize',13,'Interpreter','latex');
+    t.Color = color;
     
     tPoint = 33;
-    drawPointer('{\itf}({\itt}) ',[tPoint,27],[exp(tPoint/10 * H_T),11],[0,0],'right','k')
-    tPoint = 36;
-    drawPointer(' {\itg}({\itt})',[tPoint,41],[exp(tPoint/10 * H_T * sqrt(LR_omegaL)),7],[0,0],'left','k')
+    name = '$f(t) = e^{H_T\, t}, \hspace{0.6em} t \geq 0$~';
+    color = 'k';
+    textPos = 'right';
+    textOffset = [0,0];
+    x = [tPoint,27];
+    y = [exp(tPoint/10 * H_T),11];
+    plot(x,y, 'Color', color, 'LineWidth',0.5,'HandleVisibility','off')
+    t = text(x(2)+textOffset(1),y(2)+textOffset(2),name,'HorizontalAlignment',textPos,'Rotation',0,'FontSize',13,'Interpreter','latex');
+    t.Color = color;
     
     % Add title etc. and save the plot
     %title(['Figure 2 ', print_today()])
     xlabel('Time {\itt} in Gyr'); ylabel('Scale factor {\ita}({\itt})')
     draw_y_axis()
     axis([-20 50 0 20])
-    save_plot('kuva_2', leg)
+    save_plot('kuva_2A', leg)
 end
 %% Figure 3
 
@@ -548,7 +596,7 @@ end
 function drawPointer(name,x,y,textOffset,textPos,color)
     hold on
     plot(x,y, 'Color', color, 'LineWidth',0.5,'HandleVisibility','off')
-    t = text(x(2)+textOffset(1),y(2)+textOffset(2),name,'HorizontalAlignment',textPos,'Rotation',0,'FontSize',9);
+    t = text(x(2)+textOffset(1),y(2)+textOffset(2),name,'HorizontalAlignment',textPos,'Rotation',0,'FontSize',10);
     t.Color = color;
     hold off
 end
@@ -791,19 +839,22 @@ function figure_9()
     findMax = false;
     
     LR1_omegaBD = 0.314;
-    LR1_alpha = 0.037;
+    %LR1_alpha = 0.037;
+    LR1_alpha = fzero(@(alpha)targetTime(alpha,LR1_omegaBD- omegaB),0.04);
     LR1_omegaL = solve_omegaL(LR1_omegaBD, LR1_alpha);
     [a1, t1, omega_LR1] = LR_model(LR1_omegaBD, LR1_omegaL, LR1_alpha, terminate_T, findMax);
     p1 = plot(t1,a1,'-','LineWidth', lineWidth, 'Color', blue);
     
     LR2_omegaBD = 0.309;
-    LR2_alpha = 0.075;
+    %LR2_alpha = 0.075;
+    LR2_alpha = fzero(@(alpha)targetTime(alpha,LR2_omegaBD- omegaB),0.04);
     LR2_omegaL = solve_omegaL(LR2_omegaBD, LR2_alpha);
     [a2, t2, omega_LR2] = LR_model(LR2_omegaBD, LR2_omegaL, LR2_alpha, terminate_T, findMax);
     p2 = plot(t2,a2,'--','LineWidth', lineWidth, 'Color', blue);
     
     LR3_omegaBD = 0.305;
-    LR3_alpha = 0.11;
+    %LR3_alpha = 0.11;
+    LR3_alpha = fzero(@(alpha)targetTime(alpha,LR3_omegaBD - omegaB),0.04);
     LR3_omegaL = solve_omegaL(LR3_omegaBD, LR3_alpha);
     [a3, t3, omega_LR3] = LR_model(LR3_omegaBD, LR3_omegaL, LR3_alpha, terminate_T, findMax);
     p3 = plot(t3,a3,'-.','LineWidth', lineWidth, 'Color', blue);
@@ -828,7 +879,7 @@ function figure_9()
     %p2.Color(4) = opacity;
     %p3.Color(4) = opacity;
     %pH.Color(4) = opacity;
-    save_plot('kuva_9', leg)
+    save_plot('kuva_9A', leg)
 end
 %% Figure A
 
