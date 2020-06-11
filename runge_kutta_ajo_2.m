@@ -85,7 +85,7 @@ format long
 %final_plot_1()
 
 % Figure 2 / Fig 3
-final_plot_50()
+%final_plot_50()
 
 % Figure 3 / Fig 4
 %final_plot_3()
@@ -105,16 +105,22 @@ final_plot_50()
 
 % Figure 8
 %figure_8()
-figure_9()
+%figure_9()
 %plot_optimum()
 %plot_optimum_error()
 
 %plotEquationsDalpha()
+
+%fig_D()
 %%
-function value = targetVal(alpha,omegaD)
+function value = targetVal(alpha,omegaD,calcOmegaL)
     global omegaLR_opt omegaB_opt
     global omegaB
-    omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    if calcOmegaL
+        omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    else
+        omegaL = 1 - omegaLR_opt/omegaB_opt * omegaB - omegaB;
+    end
     [~, ~, omega_LR1] = LR_model(omegaB + omegaD, omegaL, alpha, true, false);
     value = (omegaD + alpha*omega_LR1(end)) / omegaB - omegaLR_opt/omegaB_opt;
 end
@@ -130,11 +136,27 @@ function value = targetTime(alpha,omegaD)
     %disp(value)
 end
 
-function values = targetValTime(omegaD, alpha)
+function res = targetTimeLR(alpha,omegaD,aLR)
+    global planckTime
+    global omegaB
+    %disp(["D: ", num2str(D)])
+    %disp(["al: ", num2str(alpha)])
+    omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    [~, t, omegaLR] = LR_model(omegaB + omegaD, omegaL, alpha, true, false);
+    res(1) = t(1) + planckTime;
+    res(2) = omegaLR(end)*alpha - aLR;
+    %disp(value)
+end
+
+function values = targetValTime(omegaD, alpha,calcOmegaL)
     global omegaLR_opt omegaB_opt
     global omegaB
     global planckTime
-    omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    if calcOmegaL
+        omegaL = solve_omegaL(omegaB+omegaD, alpha);
+    else
+        omegaL = 1 - omegaLR_opt/omegaB_opt * omegaB - omegaB;
+    end
     [~, t, omega_LR] = LR_model(omegaB + omegaD, omegaL, alpha, true, false);
     values(1) = (omegaD + alpha*omega_LR(end)) / omegaB - omegaLR_opt/omegaB_opt;
     values(2) = t(1) + planckTime;
@@ -270,13 +292,13 @@ end
 %% 
 % Solver for $\Omega^D$ and $\alpha$, such that age of the universe matches 
 % with the Friedmann model, $T=13.824 \ldots$, and $\Omega^D + \alpha \Omega^{\Lambda 
-% R}_T = \frac{\Omega^{\Lambda R}_{T,opt}}{\Omega^B_{opt}} \Omega^B = 0.28116 
+% R}_T = \frac{\Omega^{\Lambda R}_{T,opt}}{\Omega^B_{opt}} \Omega^B = 0.2811609 
 % \ldots$.
 
 function [omegaD_opt, alpha_opt] = optimizeDalpha()
     global a0
     opt = optimoptions('fsolve','FunctionTolerance', a0,'StepTolerance',a0, 'MaxFunctionEvaluations', 1e5, 'Display', 'off');
-    x = fsolve(@(x)targetValTime(x(1), x(2)),[0.26,0.083], opt);
+    x = fsolve(@(x)targetValTime(x(1), x(2), false),[0.26,0.083], opt);
     omegaD_opt = x(1);
     alpha_opt = x(2);
 end
@@ -290,7 +312,9 @@ function res = print_num(x, n)
     res = num2str(round(x,n));
 end
 function res = print_num_sig(x, n)
-    if (x >= 0.01) && (x < 1000000)
+    if x == 0
+        res = '0.000';
+    elseif (round(x,3) >= 0.01) && (x < 1000000)
         %res = num2str(round(x,3), '%f3');
         res = sprintf('%0.3f',round(x,3));
         res = strrep(res,'e','E');
@@ -962,7 +986,7 @@ function plotEquationsDalpha()
     
     opt = optimoptions('fsolve','FunctionTolerance', 1e-3,'StepTolerance',1e-3, 'MaxFunctionEvaluations', ceil(-log10(a0)), 'Display', 'off');
     
-    valEq = arrayfun(@(D)fsolve(@(alpha)targetVal(alpha,D),1.050375-3.73625*D,opt), D_array);
+    valEq = arrayfun(@(D)fsolve(@(alpha)targetVal(alpha,D,false),1.050375-3.73625*D,opt), D_array);
     timeEq = arrayfun(@(D)fsolve(@(alpha)targetTime(alpha,D),2.498425-9.25875*D,opt), D_array);
     plot(D_array,valEq,'-','LineWidth', lineWidth, 'Color', red)
     plot(D_array,timeEq,'--','LineWidth', lineWidth, 'Color', blue)
@@ -971,4 +995,150 @@ function plotEquationsDalpha()
     ylabel('{\itα}')
     plot(xlim, [0 0], '-k', 'LineWidth',0.5,'HandleVisibility','off')
     save_plot('equation_solutions',leg)
+end
+%% Figure D
+
+function fig_D()
+    figure; hold on
+    global omegaB FH_omegaD FH_omegaL
+    global omegaD_opt alpha_opt
+    global red blue lineWidth a0
+    alphaLR_array = [0.01; 0.02; 0.03];
+    opt = optimoptions('fsolve','FunctionTolerance', a0,'StepTolerance',a0, 'MaxFunctionEvaluations', 1e5, 'Display', 'off');
+    %x = fsolve(@(x)targetValTime(x(1), x(2), false),[0.26,0.083], opt);
+    res = zeros(2,length(alphaLR_array)+1);
+    
+    res(1,1) = 0;
+    res(2,1) = fsolve(@(D)targetTime(0,D), 0.26, opt);
+    
+    res(:,2) = fsolve(@(aD)targetTimeLR(aD(1),aD(2),alphaLR_array(1)), [0.1, 0.26], opt);
+    res(:,3) = fsolve(@(aD)targetTimeLR(aD(1),aD(2),alphaLR_array(2)), [0.1, 0.26], opt);
+    res(:,4) = fsolve(@(aD)targetTimeLR(aD(1),aD(2),alphaLR_array(3)), [0.1, 0.26], opt);
+    disp(res)
+    
+    LR1_omegaL = solve_omegaL(res(2,1) + omegaB, res(1,1));
+    LR2_omegaL = solve_omegaL(res(2,2) + omegaB, res(1,2));
+    LR3_omegaL = solve_omegaL(res(2,3) + omegaB, res(1,3));
+    LR4_omegaL = solve_omegaL(res(2,4) + omegaB, res(1,4));
+    
+    LR1_alpha = res(1,1);
+    LR2_alpha = res(1,2);
+    LR3_alpha = res(1,3);
+    LR4_alpha = res(1,4);
+    
+    LR1_omegaBD = res(2,1) + omegaB;
+    LR2_omegaBD = res(2,2) + omegaB;
+    LR3_omegaBD = res(2,3) + omegaB;
+    LR4_omegaBD = res(2,4) + omegaB;
+    
+    terminate_T = true;
+    findMax = false;
+    
+    %LR1_omegaBD = 0.314;
+    %LR1_alpha = 0.037;
+    
+    %LR1_alpha = fzero(@(alpha)targetTime(alpha,LR1_omegaBD- omegaB),0.04);
+    %LR1_omegaL = solve_omegaL(LR1_omegaBD, LR1_alpha);
+    [a1, t1, omega_LR1] = LR_model(LR1_omegaBD, LR1_omegaL, LR1_alpha, terminate_T, findMax);
+    p1 = plot(t1,a1,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    %LR2_omegaBD = 0.309;
+    %LR2_alpha = 0.075;
+    %LR2_alpha = fzero(@(alpha)targetTime(alpha,LR2_omegaBD- omegaB),0.04);
+    %LR2_omegaL = solve_omegaL(LR2_omegaBD, LR2_alpha);
+    [a2, t2, omega_LR2] = LR_model(LR2_omegaBD, LR2_omegaL, LR2_alpha, terminate_T, findMax);
+    p2 = plot(t2,a2,'--','LineWidth', lineWidth, 'Color', blue);
+    
+    %LR3_omegaBD = 0.305;
+    %LR3_alpha = 0.11;
+    %LR3_alpha = fzero(@(alpha)targetTime(alpha,LR3_omegaBD - omegaB),0.04);
+    %LR3_omegaL = solve_omegaL(LR3_omegaBD, LR3_alpha);
+    [a3, t3, omega_LR3] = LR_model(LR3_omegaBD, LR3_omegaL, LR3_alpha, terminate_T, findMax);
+    p3 = plot(t3,a3,'-.','LineWidth', lineWidth, 'Color', blue);
+    
+    [a4, t4, omega_LR4] = LR_model(LR4_omegaBD, LR4_omegaL, LR4_alpha, terminate_T, findMax);
+    p4 = plot(t4,a4,':','LineWidth', lineWidth, 'Color', blue);
+    
+    H_omegaL = 1-(omegaB+FH_omegaD);
+    [aH, tH, omega_LRH] = F_model((omegaB+FH_omegaD), H_omegaL, terminate_T, findMax);
+    pH = plot(tH,aH ,'LineWidth', lineWidth, 'Color', red);
+    
+    leg = legend([pH p1 p2 p3 p4],...
+        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR')},...
+        'Location',...
+        'northwest');
+    xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
+    axis([-16 1 0 1.1])
+    daspect([1 0.1 1])
+    draw_y_axis()
+    %opacity = 0.3;
+    %p1.Color(4) = opacity;
+    %p2.Color(4) = opacity;
+    %p3.Color(4) = opacity;
+    %pH.Color(4) = opacity;
+    save_plot('kuva_D', leg)
+    
+    t = linspace(t1(1), 0, 300);
+    
+    LR_omegaL = solve_omegaL(omegaB+omegaD_opt, alpha_opt);
+    [aOpt, tOpt, omega_LROpt] = LR_model(omegaB + omegaD_opt, LR_omegaL, alpha_opt, true, false);
+    
+    diff = arrayfun(@(value)difference(value,tOpt,aOpt,tH,aH), t);
+    diff1 = arrayfun(@(value)difference(value,t1,a1,tH,aH), t);
+    diff2 = arrayfun(@(value)difference(value,t2,a2,tH,aH), t);
+    diff3 = arrayfun(@(value)difference(value,t3,a3,tH,aH), t);
+    diff4 = arrayfun(@(value)difference(value,t4,a4,tH,aH), t);
+    
+    figure; hold on;
+    p1 = plot(t,abs(diff1),    '-','LineWidth', lineWidth, 'Color', blue);
+    p2 = plot(t,abs(diff2),   '--','LineWidth', lineWidth, 'Color', blue);
+    p3 = plot(t,abs(diff3),   '-.','LineWidth', lineWidth, 'Color', blue);
+    p4 = plot(t,abs(diff4),    ':','LineWidth', lineWidth, 'Color', blue);
+    pOpt = plot(t,abs(diff),     '-','LineWidth', lineWidth, 'Color', 'k');
+    
+    leg = legend([pOpt p1 p2 p3 p4],...
+        {legend_text('Laurin opt.', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt,alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR')},...
+        'Location',...
+        'northeast');
+    
+    xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
+    axis([-14 0 0 4e-3])
+    save_plot('kuva_D_abs', leg)
+    
+    t = linspace(t1(1) + 1e-2, 0, 300);
+    
+    diffRel = arrayfun(@(value)differenceRel(value,tOpt,aOpt,tH,aH), t);
+    diffRel1 = arrayfun(@(value)differenceRel(value,t1,a1,tH,aH), t);
+    diffRel2 = arrayfun(@(value)differenceRel(value,t2,a2,tH,aH), t);
+    diffRel3 = arrayfun(@(value)differenceRel(value,t3,a3,tH,aH), t);
+    diffRel4 = arrayfun(@(value)differenceRel(value,t4,a4,tH,aH), t);
+    
+    figure; hold on;
+    p1 = plot(t,abs(diffRel1), '-','LineWidth', lineWidth, 'Color', blue);
+    p2 = plot(t,abs(diffRel2),'--','LineWidth', lineWidth, 'Color', blue);
+    p3 = plot(t,abs(diffRel3),'-.','LineWidth', lineWidth, 'Color', blue);
+    p4 = plot(t,abs(diffRel4), ':','LineWidth', lineWidth, 'Color', blue);
+    pOpt = plot(t,abs(diffRel),  '-','LineWidth', lineWidth, 'Color', 'k');
+    
+    leg = legend([pOpt p1 p2 p3 p4],...
+        {legend_text('Laurin opt.', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt,alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
+         legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR')},...
+        'Location',...
+        'northeast');
+    
+    xlabel('Time {\itt} in Gyr'); ylabel('Relative error');
+    axis([-14 0 0 0.018])
+    save_plot('kuva_D_rel', leg)
+    
 end
