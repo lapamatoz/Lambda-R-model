@@ -96,36 +96,8 @@ end
 % 
 % With Friedmann differential equation typically only 6-7 steps is needed, due 
 % to its almost linear shape at $a(T)=1$.
-% Initial values for the secant method
-h_k = [0, h];
-a_k = [a(p-1), a(p)];
-% 100 step limit for the secant method
-for k = 1:100
-    
-    % Conditions for breaking the loop
-    if a_k(2) - 1 == 0 || h_k(1) - h_k(2) == 0 || a_k(1) - a_k(2) == 0
-        break;
-    else
-        
-        % Evaluate new step size with previous iteration with secant equation
-        h_new = h_k(2) - ...
-            (a_k(2)-1) * (h_k(1)-h_k(2)) / (a_k(1)-a_k(2));
-        
-        a_k(1) = a_k(2);
-        h_k(1) = h_k(2);
-        
-        % Calculate new point with RK4
-        [a_k(2), b(p), t(p)] =...
-                next_point(a_dot, b_dot, a(p-1), b(p-1), t(p-1), h_new);
-            
-        h_k(2) = h_new;
-        
-    end
-end
-% Save T to a variable
+[a(p), b(p), t(p)] = secantMethod(@(adot,bdot,a,b)a-1, a_dot, b_dot, t(p-1), h, a(p-1), a(p), b(p-1), b(p));
 T = t(p);
-% Save the final values of a, b and t.
-a(p) = a_k(2);
 %% Integrating from $T$ to $t_n$
 % If |terminate_T| is true, we slice the arrays and don't iterate anymore. If 
 % |terminate_T| is false, we continue integrating the same way as before.
@@ -146,43 +118,19 @@ else
         p = p+1;
     end
 end
-%% 
+%% Finding maximum of b / a
+% Finds maximum of $b/a \iff \frac{d (b/a)}{dt} = 0$. By chain rule, we get
 % 
-%% Finding max
+% $$\frac{d(ba^{-1})}{dt} = a^{-1} \dot{b} - b a^{-2} \dot{a} = 0$$
+% 
+% and multiplying both sides with $a^2$, we get $a \dot{b} - b \dot{a} = 0$.
 if findMax
     q = 1;
     while b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q) > 0 && q < length(a)
         q = q+1;
     end
     
-    % Initial values for the secant method
-    h_k = [0, (q-1)^3 * initial_step];
-    f_k = [b_dot(t(q-1), a(q-1), b(q-1)) * a(q-1) - a_dot(t(q-1), a(q-1), b(q-1)) * b(q-1),...
-            b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q)];
-    
-    % 100 step limit for the secant method
-    for k = 1:100
-        
-        % Conditions for breaking the loop
-        if f_k(2) == 0 || h_k(1) - h_k(2) == 0 || f_k(1) - f_k(2) == 0
-            break;
-        else
-            
-            % Evaluate new step size with previous iteration with secant equation
-            h_new = h_k(2) - ...
-                (b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q)) * (h_k(1)-h_k(2)) / (f_k(1)-f_k(2));
-            
-            f_k(1) = f_k(2);
-            h_k(1) = h_k(2);
-            
-            % Calculate new point with RK4
-            [a(q), b(q), t(q)] =...
-                    next_point(a_dot, b_dot, a(q-1), b(q-1), t(q-1), h_new);
-                
-            h_k(2) = h_new;
-            
-        end
-    end
+    [a(q), b(q), t(q)] = secantMethod(@(adot,bdot,a,b)bdot*a - adot*b, a_dot, b_dot, t(q-1), (q-1)^3 * initial_step, a(q-1), a(q), b(q-1), b(q));
 end
 %% 
 % Finally, we do a unit conversion. The algorithm is finished after this line.
@@ -204,5 +152,39 @@ function [a_res, b_res, t_res] = next_point(a_dot, b_dot, a, b, t, h)
     b_res = b + 1/6 * (l_0 + 2*l_1 + 2*l_2 + l_3);
     
     t_res = t + h;
+end
+%% Secant Method
+function [a,b,t] = secantMethod(fun, a_dot, b_dot, t0, h0, a0, a1, b0, b1)
+    % Initial values for the secant method
+    h_k = [0, h0];
+    
+    f_k = [fun(a_dot(t0, a0, b0), b_dot(t0, a0, b0), a0, b0), fun(a_dot(t0+h0, a1, b1), b_dot(t0+h0, a1, b1), a1, b1)];
+    
+    a = (a0+a1)/2 ; b = (b0+b1)/2 ; t = t0 + h0/2;
+    
+    % 100 step limit for the secant method
+    for w = 1:100
+        
+        % Conditions for breaking the loop
+        if f_k(2) == 0 || h_k(1) - h_k(2) == 0 || f_k(1) - f_k(2) == 0
+            break;
+        else
+            
+            % Evaluate new step size with previous iteration with secant equation
+            h_new = h_k(2) - ...
+                f_k(2) * (h_k(1)-h_k(2)) / (f_k(1)-f_k(2));
+            
+            f_k(1) = f_k(2);
+            h_k(1) = h_k(2);
+            
+            % Calculate new point with RK4
+            [a, b, t] =...
+                    next_point(a_dot, b_dot, a0, b0, t0, h_new);
+                
+            h_k(2) = h_new;
+            f_k(2) = fun(a_dot(t, a, b), b_dot(t, a, b), a, b);
+            
+        end
+    end
 end
 end

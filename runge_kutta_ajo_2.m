@@ -15,7 +15,8 @@ close all
 % Here we declare global variables, First is Hubble constant, with correction 
 % factor, in unit (10 Gyr)^-1.
 
-global H_T; H_T = 0.6715 * 1.0226;
+global H_T ; H_T = 0.6726 * 3.15576 / (1.495978707 * 6.48 / pi);
+%H_T = 0.6715 *1.0226;
 %% 
 % Precision value: smaller gives more precise result. This single value affects 
 % various tolerance values in different algorithms.
@@ -31,7 +32,7 @@ global t_end; t_end = 69;
 %% 
 % Parameters for the models. $\Omega^{\Lambda}$ for the $\Lambda R$-model is 
 % solved from equation $\Omega^{B} + \Omega^{\Lambda} + \Omega^{\Lambda R}_T = 
-% 1$. Function for |solve_omegaL| is provided later.
+% 1$. Function |solve_omegaL| is defined below.
 
 global omegaB;    omegaB    = 0.049;
 
@@ -70,7 +71,7 @@ global green; green = [ 24, 185,  50]/255;
 % Line width in plots
 global lineWidth; lineWidth = 1;
 
-% Matlab doesn't round results in console
+% With this Matlab won't round results in console
 format long
 %% Calling the Plotting Functions
 % Here you can select which Figures you want to plot. Comment out the ones that 
@@ -79,39 +80,42 @@ format long
 %[a_res, t_res, omega_LR] = LR_model(1,0, 1,true);
 %disp(-t_res(1) - 9.70860731629968)
 
-%legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, FH_omegaD,NaN, FH_omegaL,'B,D','a,aR')
+%legend_text('F-model (benchmark)', omega_LRH(end),-tH(1),omegaB, FH_omegaD,NaN, FH_omegaL,'B,D','a,aR')
 
 % Figure 1 / Fig 1
-%final_plot_1()
+final_plot_1()
 
 % Figure 2 / Fig 3
-%final_plot_50()
+final_plot_50()
 
 % Figure 3 / Fig 4
-%final_plot_3()
+final_plot_3()
 
 % Figure 4 / Fig 5-7
-%final_plot_4()
+final_plot_4()
 
 % Figure 5 / Fig 8-16
-%final_plot_many_B()
+final_plot_many_B()
 
 % Figure 6 / 19 yhtälö 25
-%[omegaB_array, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
-%print_table_two_col([omegaB_array,omegaLR*1000,omegaL*1000,T], [4 4 4 5])
-%print_table_two_col([omegaB_array*100, omegaLR_lin*100, omegaL_lin*100], [2 2 2])
+[omegaB_array, omegaLR, omegaL, T, omegaLR_lin, omegaL_lin] = final_plot_RB();
+%print_table_two_col([omegaB_array,omegaLR,omegaL,T], [4 4 4 3])
+%print_table_two_col([omegaB_array, omegaLR_lin, omegaL_lin], [2 2 2])
 
 %print_num_sig(0.0099,4)
 
 % Figure 8
-%figure_8()
-%figure_9()
+figure_8()
+%figure_9_legacy()
 %plot_optimum()
 %plot_optimum_error()
 
 %plotEquationsDalpha()
 
-%fig_D()
+fig_9_to_11()
+
+%plot_diff_H()
+%plot_diff_H_error()
 %%
 function value = targetVal(alpha,omegaD,calcOmegaL)
     global omegaLR_opt omegaB_opt
@@ -311,6 +315,15 @@ function res = print_num(x, n)
     %res = num2str(round(x,n,'significant'));
     res = num2str(round(x,n));
 end
+
+function res = print_num2(x, n)
+    if x < 1
+        res = num2str(round(x,4));
+    else
+        res = num2str(round(x,3));
+    end
+end
+
 function res = print_num_sig(x, n)
     if x == 0
         res = '0.000';
@@ -338,11 +351,48 @@ end
 % the legend's line samples. Variable |size| modifies text size. Smaller value 
 % corresponds to a bigger font size.
 
-function save_plot(name, leg)
+function save_plot(name, leg, plot_HT)
+    global H_T
     figuresize(19.5, 11.96, 'cm')
     grid on
     if ~isa(leg, 'double')
         leg.ItemTokenSize = [30,18]*0.60; % default [30,18]
+    end
+    if plot_HT
+        %ax = gca;
+        set(gca,'units','points');
+        %AxesPos = get(ax, 'position');
+        %yscale = get(ax, 'ylim');
+        legPos = leg.Position;
+        dim = [legPos(1) legPos(2) 0 0];
+        str = ['{\itH}_{\itT} = ' num2str(H_T / 3.15576 * (1.495978707 * 6.48 / pi)), ' kms^{-1}Mpc^{-1}'];
+    end
+    
+    if plot_HT && leg.Location == "northwest" && leg.Visible == "on"
+        vert = 'top';
+        horz = 'left';
+    elseif plot_HT && leg.Location == "northwest" && leg.Visible == "off"
+        vert = 'top';
+        horz = 'left';
+        dim = [legPos(1) legPos(2)+legPos(4) 0 0];
+    elseif plot_HT && leg.Location == "northeast" && leg.Visible == "on"
+        vert = 'top';
+        horz = 'right';
+        dim = [legPos(1)+legPos(3) legPos(2) 0 0];
+    elseif plot_HT && leg.Location == "southeast" && leg.Visible == "on"
+        vert = 'bottom';
+        horz = 'right';
+        dim = [legPos(1)+legPos(3) legPos(2)+legPos(4) 0 0];
+    elseif plot_HT && leg.Location == "southwest" && leg.Visible == "on"
+        vert = 'bottom';
+        horz = 'left';
+    else
+        vert = 'middle';
+        horz = 'center';
+    end
+    
+    if plot_HT
+        annotation('textbox',dim,'String',str,'FitBoxToText','on','FontSize',leg.FontSize,'BackgroundColor','white','Margin',3,'VerticalAlignment',vert,'HorizontalAlignment',horz,'LineWidth',leg.LineWidth);
     end
     saveas(gcf, [name, '.pdf'])
 end
@@ -352,28 +402,28 @@ end
 function res = legend_text(name,R,T,B,D,alpha,L,BDFormat,alphaLRFormat)
     res = [name ': '];
     if ~isnan(R) &&  (alphaLRFormat == "R"|| alphaLRFormat == "R,aR" || alphaLRFormat == "a,R" || alphaLRFormat == "a,R,aR")
-        res = [res 'Ω^{ΛR}_{\itT} = ' print_num_sig(R,4) ', '];
+        res = [res 'Ω^{ΛR}_{\itT} = ' print_num2(R,4) ', '];
     end
     if ~isnan(B) && (BDFormat == "B"|| BDFormat == "B,D" || BDFormat == "B,BD" || BDFormat == "B,D,BD")
-        res = [res 'Ω^{\itB} = ' print_num_sig(B,4) ', '];
+        res = [res 'Ω^{\itB} = ' print_num2(B,4) ', '];
     end
     if ~isnan(D) && (BDFormat == "D"|| BDFormat == "B,D" || BDFormat == "D,BD" || BDFormat == "B,D,BD")
-        res = [res 'Ω^{\itD} = ' print_num_sig(D,4) ', '];
+        res = [res 'Ω^{\itD} = ' print_num2(D,4) ', '];
     end
     if ~isnan(B) && ~isnan(D) && (BDFormat == "BD"|| BDFormat == "B,BD" || BDFormat == "D,BD" || BDFormat == "B,D,BD")
-        res = [res 'Ω^{{\itB}+{\itD}} = ' print_num_sig(B+D,4) ', '];
+        res = [res 'Ω^{{\itB}+{\itD}} = ' print_num2(B+D,4) ', '];
     end
     if ~isnan(alpha) && (alphaLRFormat == "a"|| alphaLRFormat == "a,aR" || alphaLRFormat == "a,R" || alphaLRFormat == "a,R,aR")
-        res = [res '{\itα} = ' print_num_sig(alpha,4) ', '];
+        res = [res '{\itα} = ' print_num2(alpha,4) ', '];
     end
     if ~isnan(alpha) && ~isnan(R) && (alphaLRFormat == "aR"|| alphaLRFormat == "a,aR" || alphaLRFormat == "R,aR" || alphaLRFormat == "a,R,aR")
-        res = [res '{\itα}Ω^{ΛR}_{\itT} = ' print_num_sig(alpha*R,4) ', '];
+        res = [res '{\itα}Ω^{ΛR}_{\itT} = ' print_num2(alpha*R,4) ', '];
     end
     if ~isnan(L)
-        res = [res 'Ω^Λ = ' print_num_sig(L,4) ', '];
+        res = [res 'Ω^Λ = ' print_num2(L,4) ', '];
     end
     if ~isnan(T)
-        res = [res '{\itT} = ' print_num_sig(T,5) ', '];
+        res = [res '{\itT} = ' print_num2(T,5) ', '];
     end
     res = res(1:end-2); % removes last ', '
 end
@@ -402,11 +452,11 @@ function print_table_two_col(matrix, precision)
     
     for p = 1:(length(matrix(1,:))-1)
         matrix(:,p)
-        res = [res, print_num(matrix(:,p), precision(p)), et];
+        res = [res, print_num2(matrix(:,p), precision(p)), et];
     end
     
     % The last column without ' & ' at the end
-    res = [res, print_num(matrix(:,end), precision(end))];
+    res = [res, print_num2(matrix(:,end), precision(end))];
     lines = ceil(length(matrix(:,1))/2);
     
     % If we have uneven number of rows, we need to add a blank row to the end
@@ -420,6 +470,37 @@ function print_table_two_col(matrix, precision)
     et = char(ones(lines,1) * ' &');
     
     disp([res(1:lines,:), et, [res(lines+1:end,:); blanks], line])
+end
+%% 
+% Functions for plotting errors between two graphs. Functions make cubic interpolation 
+% to the data sets and then calculates the difference at n points.
+
+% function d = difference(value,X1,Y1,X2,Y2)
+%     val1 = interp1(X1,Y1,value,'pchip');
+%     val2 = interp1(X2,Y2,value,'pchip');
+%     d = abs(val1-val2);
+% end
+% 
+% function d = differenceRel(value,X1,Y1,X2,Y2)
+%     val1 = interp1(X1,Y1,value,'pchip');
+%     val2 = interp1(X2,Y2,value,'pchip');
+%     d = abs((val1-val2)/val2);
+% end
+
+function [pts,y] = differenceGraphs(n, x1, y1, x2, y2)
+    pts = linspace(max(min(x1),min(x2)), min(max(x1),max(x2)), n);
+    %pts(1) = 0.99 * pts(1) + 0.01 * pts(2);
+    vals1 = interp1(x1,y1,pts,'pchip');
+    vals2 = interp1(x2,y2,pts,'pchip');
+    y = abs(vals1 - vals2);
+end
+
+function [pts,y] = differenceGraphsRel(n, x1, y1, x2, y2)
+    pts = linspace(max(min(x1),min(x2)), min(max(x1),max(x2)), n);
+    pts(1) = 0.9 * pts(1) + 0.1 * pts(2);
+    vals1 = interp1(x1,y1,pts,'pchip');
+    vals2 = interp1(x2,y2,pts,'pchip');
+    y = abs((vals1 - vals2)./vals1);
 end
 %% Figure 1
 % Plot showing scale factor $a(t)$ of the Friedmann model and $\Lambda R$-model. 
@@ -457,7 +538,7 @@ function final_plot_1()
     
     % Set plot legend
     leg = legend([pH p0 p1],...
-        {legend_text('F-model (Planck data)',  omega_LRH(end), -tH(1), omegaB,  FH_omegaD, NaN, FH_omegaL, 'B,D', ''), ...
+        {legend_text('F-model (benchmark)',  omega_LRH(end), -tH(1), omegaB,  FH_omegaD, NaN, FH_omegaL, 'B,D', ''), ...
          legend_text('F-model',  omega_LR0(end), -t0(1), omegaB,  F_omegaD, NaN, F_omegaL, 'BD', ''), ...
          legend_text('ΛR-model', omega_LR1(end), -t1(1), omegaB, NaN,      NaN, LR_omegaL, 'B', '')},...
         'Location',...
@@ -469,7 +550,7 @@ function final_plot_1()
     axis([-18 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
-    save_plot('kuva_1', leg)
+    save_plot('kuva_1', leg, true)
 end
 %% Figure 2
 
@@ -505,7 +586,7 @@ function final_plot_50()
     
     % Add legend to the plot
     leg = legend([p0 p1],...
-        {legend_text('F-model (Planck data)', NaN,-t0(1),omegaB,FH_omegaD,NaN,FH_omegaL, 'BD', '') ...
+        {legend_text('F-model (benchmark)', NaN,-t0(1),omegaB,FH_omegaD,NaN,FH_omegaL, 'BD', '') ...
          legend_text('ΛR-model',NaN,-t1(1),omegaB, NaN,NaN, LR_omegaL, 'B' , '')},...
         'Location',...
         'northwest');
@@ -543,7 +624,7 @@ function final_plot_50()
     xlabel('Time {\itt} in Gyr'); ylabel('Scale factor {\ita}({\itt})')
     draw_y_axis()
     axis([-20 50 0 20])
-    save_plot('kuva_2A', leg)
+    save_plot('kuva_2A', leg, true)
 end
 %% Figure 3
 
@@ -582,8 +663,8 @@ function final_plot_3()
     drawPointer(print_num(LR_max_t,4),[LR_max_t, LR_max_t],[LR_max_omega_LR,0.094],[0,-0.006],'left',blue)
     
     leg = legend([p0, p1],...
-            {legend_text('Ω^{ΛR}(t) along F-model trajectory', NaN, NaN, omegaB,  FH_omegaD, NaN, LR_omegaL, '', '') ...
-             legend_text('Ω^{ΛR}(t)',NaN, NaN, omegaB, NaN, NaN, LR_omegaL, '', '')},...
+            {[legend_text('Ω^{ΛR}({\itt})', NaN, NaN, omegaB,  FH_omegaD, NaN, LR_omegaL, '', ''), ', {\ita}_{\itt} along F-model trajectory'] ...
+             legend_text('Ω^{ΛR}({\itt})',NaN, NaN, omegaB, NaN, NaN, LR_omegaL, '', '')},...
              'Location',...
              'southeast');
     
@@ -602,7 +683,7 @@ function final_plot_3()
     xlabel('Time {\itt} in Gyr'); ylabel('Ω^{ΛR}({\itt})')
     axis([-20 50 0 0.3])
     draw_y_axis()
-    save_plot('kuva_3', leg)
+    save_plot('kuva_3', leg, true)
 end
 
 function draw_x_value(name,value,xmin,xIntersect,color,offset)
@@ -670,7 +751,7 @@ function final_plot_4()
     axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
-    save_plot('kuva_4', leg)
+    save_plot('kuva_4', leg, true)
 end
 %% Figure 5
 
@@ -692,8 +773,10 @@ function final_plot_many_B()
     xlabel('Time {\itt} in Gyr'); ylabel('Ω^{ΛR}({\itt})')
     axis([-20 50 0 0.3])
     draw_y_axis()
+    leg = legend('Location','northwest');
+    leg.Visible = 'off';
     
-    save_plot('kuva_5', NaN);
+    save_plot('kuva_5', leg, true);
 end
 
 function p1 = drawNewB(B,color,mark,textB)
@@ -759,17 +842,26 @@ function [omegaB_table, omegaLR_table, omegaL_table, T_table, omegaLR_table_lin,
     % Draw red x at Bopt and omegaB
     plot(omegaB_plot([indOptLeft, indOpt, indOptRight]), omegaLR_plot_lin([indOptLeft, indOpt, indOptRight]), '+', 'Color', red, 'LineWidth', lineWidth);
     plot(omegaB_plot([indOptLeft, indOpt, indOptRight]), omegaLR_plot([indOptLeft, indOpt, indOptRight]),     '+', 'Color', red, 'LineWidth', lineWidth);
+    plot(omegaB_plot([indOptLeft, indOpt, indOptRight]), [0 0 0],     '+', 'Color', red, 'LineWidth', lineWidth);
+    
+    %drawPointer(name,x,y,textOffset,textPos,color)
+    drawPointer(print_num2(omegaLR_plot(indOpt)),[omegaB_opt 0.22],[omegaLR_plot(indOpt) omegaLR_plot(indOpt)],[0 0],'left',red)
+    drawPointer('Nearly optimal parameter domain [0.042, 0.05]', [omegaB_plot(indOptLeft ) 0.15], [0 0.06], [0.01 0], 'left', red);
+    drawPointer('',               [omegaB_plot(indOptRight) 0.15], [0 0.06], [0 0], 'left', red);
+    
+    drawPointer(print_num2(omegaB_opt), [omegaB_opt omegaB_opt], [0 0.075], [-0.03 0.01], 'left', red);
+    
     
     leg = legend([p1 p2],...
-        {'Ω^{ΛR}_T distribution',...
-         'Ω^{ΛR}_T distribution with linear approximation for {\ita}({\itt})'},...
+        {'Ω^{ΛR}_{\itT}-distribution',...
+         'Ω^{ΛR}_{\itT}-distribution with linear approximation for {\ita}({\itt})'},...
         'Location',...
         'northeast');
     
     % Set title etc. and save the figure
     xlabel('Ω^{\itB}'); ylabel('Ω^{ΛR}_{\itT}')
     %title(['Figure 6, ', print_today()])
-    save_plot('kuva_6', leg)
+    save_plot('kuva_6', leg, true)
     
     % Let's create the table
     omegaL_table = zeros(length(omegaB_table),1);
@@ -817,12 +909,14 @@ function figure_8()
     
     LR3_omegaBD = 0.293;
     LR3_alpha = 0.22;
+    LR3_alpha = fzero(@(alpha)targetTime(alpha,LR3_omegaBD- omegaB),0.22);
     LR3_omegaL = solve_omegaL(LR3_omegaBD, LR3_alpha);
     [a3, t3, omega_LR3] = LR_model(LR3_omegaBD, LR3_omegaL, LR3_alpha, terminate_T, findMax);
     p3 = plot(t3,a3,'-.','LineWidth', lineWidth, 'Color', blue);
     
     LR4_omegaBD = 0.253;
     LR4_alpha = 0.63;
+    LR4_alpha = fzero(@(alpha)targetTime(alpha,LR4_omegaBD- omegaB),0.63);
     LR4_omegaL = solve_omegaL(LR4_omegaBD, LR4_alpha);
     [a4, t4, omega_LR4] = LR_model(LR4_omegaBD, LR4_omegaL, LR4_alpha, terminate_T, findMax);
     p4 = plot(t4,a4,'--','LineWidth', lineWidth, 'Color', blue);
@@ -837,23 +931,23 @@ function figure_8()
     %p0 = plot(t0,a0,'--','LineWidth', lineWidth, 'Color', red);
     
     leg = legend([pH p3 p4 p2 p1],...
-        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D','a,aR'),...
+        {legend_text('F-model (benchmark)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D','a,aR'),...
     legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
 legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northwest');
-    xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
+    xlabel('Time {\itt} in Gyr'); ylabel('{\ita}({\itt})')
     axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
-    save_plot('kuva_8', leg)
+    save_plot('kuva_8', leg, true)
 end
     
 %% Figure 9
 
-function figure_9()
+function figure_9_legacy() % see document from 11.6.2020
     figure; hold on;
     global omegaB FH_omegaD
     global omegaB LR_omegaL
@@ -888,13 +982,13 @@ function figure_9()
     pH = plot(tH,aH ,'LineWidth', lineWidth, 'Color', red);
     
     leg = legend([pH p1 p2 p3],...
-        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D', 'a,aR'),...
+        {legend_text('F-model (benchmark)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northwest');
-    xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
+    xlabel('Time {\itt} in Gyr'); ylabel('{\ita}({\itt})')
     axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
@@ -903,7 +997,7 @@ function figure_9()
     %p2.Color(4) = opacity;
     %p3.Color(4) = opacity;
     %pH.Color(4) = opacity;
-    save_plot('kuva_9A', leg)
+    save_plot('kuva_9A', leg, true)
 end
 %% Figure A
 
@@ -921,15 +1015,15 @@ function plot_optimum()
     pH = plot(tH,aH,'LineWidth', lineWidth, 'Color', red);
 
     leg = legend([pH p1],...
-    {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, FH_omegaD,NaN, FH_omegaL,'B,D','a,aR'),...
+    {legend_text('F-model (benchmark)', omega_LRH(end),-tH(1),omegaB, FH_omegaD,NaN, FH_omegaL,'B,D','a,aR'),...
      legend_text('ΛR-model', omega_LR(end), -t1(1), omegaB, omegaD_opt, alpha_opt, LR_omegaL,'B,D','a,aR')},...
     'Location',...
     'northwest');
     axis([-16 1 0 1.1])
     daspect([1 0.1 1])
-    xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
+    xlabel('Time {\itt} in Gyr'); ylabel('{\ita}({\itt})')
     draw_y_axis()
-    save_plot('kuva_A', leg)
+    save_plot('kuva_A', leg, true)
 end
 %% Figure B
 
@@ -950,32 +1044,7 @@ function plot_optimum_error()
     plot(t,abs(diffRel),'-','LineWidth', lineWidth, 'Color', red);
     leg = legend('Absolute error','Relative error');
     xlabel('Time {\itt} in Gyr')
-    save_plot('error_plot', leg);
-end
-
-function ind = nearestTwoPts(set,value)
-    [~, ind] = sort(abs(set-value));
-    ind = ind(1:2);
-end
-
-function d = differenceRel(value,X1,Y1,X2,Y2)
-    ind1 = nearestTwoPts(X1,value);
-    ind2 = nearestTwoPts(X2,value);
-    t1 = (value - X1(ind1(2))) / (X1(ind1(1)) - X1(ind1(2)));
-    t2 = (value - X2(ind2(2))) / (X2(ind2(1)) - X2(ind2(2)));
-    y1 = t1 * Y1(ind1(1)) + (1 - t1) * Y1(ind1(2));
-    y2 = t2 * Y2(ind2(1)) + (1 - t2) * Y2(ind2(2));
-    d = (max(0,y1)-max(0,y2))/y2;
-end
-
-function d = difference(value,X1,Y1,X2,Y2)
-    ind1 = nearestTwoPts(X1,value);
-    ind2 = nearestTwoPts(X2,value);
-    t1 = (value - X1(ind1(2))) / (X1(ind1(1)) - X1(ind1(2)));
-    t2 = (value - X2(ind2(2))) / (X2(ind2(1)) - X2(ind2(2)));
-    y1 = t1 * Y1(ind1(1)) + (1 - t1) * Y1(ind1(2));
-    y2 = t2 * Y2(ind2(1)) + (1 - t2) * Y2(ind2(2));
-    d = (max(0,y1)-max(0,y2));
+    save_plot('error_plot', leg, true);
 end
 %% Figure C
 
@@ -994,11 +1063,11 @@ function plotEquationsDalpha()
     xlabel('Ω^{\itD}')
     ylabel('{\itα}')
     plot(xlim, [0 0], '-k', 'LineWidth',0.5,'HandleVisibility','off')
-    save_plot('equation_solutions',leg)
+    save_plot('equation_solutions',leg, true)
 end
 %% Figure D
 
-function fig_D()
+function fig_9_to_11()
     figure; hold on
     global omegaB FH_omegaD FH_omegaL
     global omegaD_opt alpha_opt
@@ -1034,25 +1103,13 @@ function fig_D()
     terminate_T = true;
     findMax = false;
     
-    %LR1_omegaBD = 0.314;
-    %LR1_alpha = 0.037;
-    
-    %LR1_alpha = fzero(@(alpha)targetTime(alpha,LR1_omegaBD- omegaB),0.04);
-    %LR1_omegaL = solve_omegaL(LR1_omegaBD, LR1_alpha);
-    [a1, t1, omega_LR1] = LR_model(LR1_omegaBD, LR1_omegaL, LR1_alpha, terminate_T, findMax);
-    p1 = plot(t1,a1,'-','LineWidth', lineWidth, 'Color', blue);
-    
-    %LR2_omegaBD = 0.309;
-    %LR2_alpha = 0.075;
-    %LR2_alpha = fzero(@(alpha)targetTime(alpha,LR2_omegaBD- omegaB),0.04);
-    %LR2_omegaL = solve_omegaL(LR2_omegaBD, LR2_alpha);
+    LR_omegaL = solve_omegaL(omegaB+omegaD_opt, alpha_opt);
+    [aOpt, tOpt, omega_LROpt] = LR_model(omegaB + omegaD_opt, LR_omegaL, alpha_opt, true, false);
+    p1 = plot(tOpt,aOpt,'-','LineWidth', lineWidth, 'Color', 'k');
+
     [a2, t2, omega_LR2] = LR_model(LR2_omegaBD, LR2_omegaL, LR2_alpha, terminate_T, findMax);
     p2 = plot(t2,a2,'--','LineWidth', lineWidth, 'Color', blue);
     
-    %LR3_omegaBD = 0.305;
-    %LR3_alpha = 0.11;
-    %LR3_alpha = fzero(@(alpha)targetTime(alpha,LR3_omegaBD - omegaB),0.04);
-    %LR3_omegaL = solve_omegaL(LR3_omegaBD, LR3_alpha);
     [a3, t3, omega_LR3] = LR_model(LR3_omegaBD, LR3_omegaL, LR3_alpha, terminate_T, findMax);
     p3 = plot(t3,a3,'-.','LineWidth', lineWidth, 'Color', blue);
     
@@ -1064,45 +1121,39 @@ function fig_D()
     pH = plot(tH,aH ,'LineWidth', lineWidth, 'Color', red);
     
     leg = legend([pH p1 p2 p3 p4],...
-        {legend_text('F-model (Planck data)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+        {legend_text('F-model (benchmark)', omega_LRH(end),-tH(1),omegaB, (omegaB+FH_omegaD)-omegaB,NaN, H_omegaL, 'B,D', 'a,aR'),...
+         legend_text('Opt. ΛR-model', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt, alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northwest');
-    xlabel('Time {\itt} in Gyr'); ylabel('a({\itt})')
+    xlabel('Time {\itt} in Gyr'); ylabel('{\ita}({\itt})')
     axis([-16 1 0 1.1])
     daspect([1 0.1 1])
     draw_y_axis()
-    %opacity = 0.3;
-    %p1.Color(4) = opacity;
-    %p2.Color(4) = opacity;
-    %p3.Color(4) = opacity;
-    %pH.Color(4) = opacity;
-    save_plot('kuva_D', leg)
+    save_plot('kuva_9', leg, true)
     
-    t = linspace(t1(1), 0, 300);
     
-    LR_omegaL = solve_omegaL(omegaB+omegaD_opt, alpha_opt);
-    [aOpt, tOpt, omega_LROpt] = LR_model(omegaB + omegaD_opt, LR_omegaL, alpha_opt, true, false);
-    
-    diff = arrayfun(@(value)difference(value,tOpt,aOpt,tH,aH), t);
-    diff1 = arrayfun(@(value)difference(value,t1,a1,tH,aH), t);
-    diff2 = arrayfun(@(value)difference(value,t2,a2,tH,aH), t);
-    diff3 = arrayfun(@(value)difference(value,t3,a3,tH,aH), t);
-    diff4 = arrayfun(@(value)difference(value,t4,a4,tH,aH), t);
+    n = 300;
     
     figure; hold on;
-    p1 = plot(t,abs(diff1),    '-','LineWidth', lineWidth, 'Color', blue);
-    p2 = plot(t,abs(diff2),   '--','LineWidth', lineWidth, 'Color', blue);
-    p3 = plot(t,abs(diff3),   '-.','LineWidth', lineWidth, 'Color', blue);
-    p4 = plot(t,abs(diff4),    ':','LineWidth', lineWidth, 'Color', blue);
-    pOpt = plot(t,abs(diff),     '-','LineWidth', lineWidth, 'Color', 'k');
     
-    leg = legend([pOpt p1 p2 p3 p4],...
-        {legend_text('Laurin opt.', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt,alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+    [t, v] = differenceGraphs(n, tH, aH, tOpt, aOpt);
+    pOpt = plot(t,v ,     '-','LineWidth', lineWidth, 'Color', 'k');
+    
+    [t, v] = differenceGraphs(n, tH, aH, t2, a2);
+    p2 = plot(t, v, '--','LineWidth', lineWidth, 'Color', blue);
+    
+    [t, v] = differenceGraphs(n, tH, aH, t3, a3);
+    p3 = plot(t, v, '-.','LineWidth', lineWidth, 'Color', blue);
+    
+    [t, v] = differenceGraphs(n, tH, aH, t4, a4);
+    p4 = plot(t, v, ':','LineWidth', lineWidth, 'Color', blue);
+    
+    
+    leg = legend([pOpt p2 p3 p4],...
+        {legend_text('Opt. ΛR-model', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt,alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR')},...
@@ -1111,34 +1162,195 @@ function fig_D()
     
     xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
     axis([-14 0 0 4e-3])
-    save_plot('kuva_D_abs', leg)
+    save_plot('kuva_10', leg, true)
     
-    t = linspace(t1(1) + 1e-2, 0, 300);
-    
-    diffRel = arrayfun(@(value)differenceRel(value,tOpt,aOpt,tH,aH), t);
-    diffRel1 = arrayfun(@(value)differenceRel(value,t1,a1,tH,aH), t);
-    diffRel2 = arrayfun(@(value)differenceRel(value,t2,a2,tH,aH), t);
-    diffRel3 = arrayfun(@(value)differenceRel(value,t3,a3,tH,aH), t);
-    diffRel4 = arrayfun(@(value)differenceRel(value,t4,a4,tH,aH), t);
     
     figure; hold on;
-    p1 = plot(t,abs(diffRel1), '-','LineWidth', lineWidth, 'Color', blue);
-    p2 = plot(t,abs(diffRel2),'--','LineWidth', lineWidth, 'Color', blue);
-    p3 = plot(t,abs(diffRel3),'-.','LineWidth', lineWidth, 'Color', blue);
-    p4 = plot(t,abs(diffRel4), ':','LineWidth', lineWidth, 'Color', blue);
-    pOpt = plot(t,abs(diffRel),  '-','LineWidth', lineWidth, 'Color', 'k');
     
-    leg = legend([pOpt p1 p2 p3 p4],...
-        {legend_text('Laurin opt.', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt,alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
-         legend_text('ΛR-model', omega_LR1(end),-t1(1),omegaB, LR1_omegaBD-omegaB,LR1_alpha, LR1_omegaL, 'B,D', 'a,aR'),...
+    [t, v] = differenceGraphsRel(n, tH, aH, tOpt, aOpt);
+    pOpt = plot(t,v ,     '-','LineWidth', lineWidth, 'Color', 'k');
+    
+    [t, v] = differenceGraphsRel(n, tH, aH, t2, a2);
+    p2 = plot(t, v, '--','LineWidth', lineWidth, 'Color', blue);
+    
+    [t, v] = differenceGraphsRel(n, tH, aH, t3, a3);
+    p3 = plot(t, v, '-.','LineWidth', lineWidth, 'Color', blue);
+    
+    [t, v] = differenceGraphsRel(n, tH, aH, t4, a4);
+    p4 = plot(t, v, ':','LineWidth', lineWidth, 'Color', blue);
+    
+    
+    leg = legend([pOpt p2 p3 p4],...
+        {legend_text('Opt. ΛR-model', omega_LROpt(end),-tOpt(1),omegaB, omegaD_opt,alpha_opt, LR_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR2(end),-t2(1),omegaB, LR2_omegaBD-omegaB,LR2_alpha, LR2_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR3(end),-t3(1),omegaB, LR3_omegaBD-omegaB,LR3_alpha, LR3_omegaL, 'B,D', 'a,aR'),...
          legend_text('ΛR-model', omega_LR4(end),-t4(1),omegaB, LR4_omegaBD-omegaB,LR4_alpha, LR4_omegaL, 'B,D', 'a,aR')},...
         'Location',...
         'northeast');
     
-    xlabel('Time {\itt} in Gyr'); ylabel('Relative error');
+    xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
     axis([-14 0 0 0.018])
-    save_plot('kuva_D_rel', leg)
+    save_plot('kuva_11', leg, true)
     
 end
+    
+%% Different H's
+
+function plot_diff_H()
+    % Create new figure frame
+    figure; hold on;
+    
+    % Load global variables
+    global omegaB FH_omegaD FH_omegaL
+    global F_omegaD F_omegaL
+    global LR_omegaL
+    global red blue lineWidth
+    global H_T
+    
+    % We only need to plot functions until a(T) = 1,
+    % so we stop the differential equation solver at that point
+    terminate_T = true;
+    findMax = false;
+    
+    HH = H_T; DH = FH_omegaD; LH = FH_omegaL;
+    
+    % Run the Friedmann model
+    [aH, tH, omega_LRH] = F_model(omegaB + FH_omegaD, FH_omegaL, terminate_T, findMax);
+    pH = plot(tH, aH, '-', 'LineWidth', lineWidth, 'Color', red);
+    
+    H_T = 0.6750 * 3.15576 / 3.08567758149137;
+    FH_omegaD = 0.312 - 0.049;
+    FH_omegaL = 0.688;
+    H0 = H_T; D0 = FH_omegaD; L0 = FH_omegaL;
+    
+    % Run the Friedmann model
+    [a0, t0, omega_LR0] = F_model(omegaB + FH_omegaD, FH_omegaL, terminate_T, findMax);
+    p0 = plot(t0, a0, '--', 'LineWidth', lineWidth, 'Color', 'k');
+    
+    H_T = 0.6785 * 3.15576 / 3.08567758149137;
+    FH_omegaD = 0.307 - 0.049;
+    FH_omegaL = 0.693;
+    H1 = H_T; D1 = FH_omegaD; L1 = FH_omegaL;
+    
+    % Run the Friedmann model
+    [a1, t1, omega_LR1] = F_model(omegaB + FH_omegaD, FH_omegaL, terminate_T, findMax);
+    p1 = plot(t1, a1, '-.', 'LineWidth', lineWidth, 'Color', blue);
+    
+    % Set plot legend
+    leg = legend([pH p0 p1],...
+        {[legend_text('F-model',  omega_LRH(end), -tH(1), omegaB,  DH, NaN, LH, 'BD', ''), ', H_T = ', sprintf('%0.8f',HH)], ...
+         [legend_text('F-model',  omega_LR0(end), -t0(1), omegaB,  D0, NaN, L0, 'BD', ''), ', H_T = ', sprintf('%0.8f',H0)], ...
+         [legend_text('F-model',  omega_LR1(end), -t1(1), omegaB,  D1, NaN, L1, 'BD', ''), ', H_T = ', sprintf('%0.8f',H1)]},...
+        'Location',...
+        'northwest');
+    
+    % Set title etc., and save the figure
+    %title(['Figure 1 ', print_today()])
+    xlabel('Time {\itt} in Gyr'); ylabel('Scale factor {\ita}({\itt})')
+    axis([-14 1 0 1.1])
+    daspect([1 0.1 1])
+    draw_y_axis()
+    save_plot('kuva_12', leg, false)
+    end
+    
+%% Different H's error; abs and rel
+
+function plot_diff_H_error()
+    figure; hold on
+    global H_T FH_omegaL FH_omegaD omegaB  
+    global red blue lineWidth
+    global planckTime
+    global a0
+    
+    %HH = H_T; DH = FH_omegaD; LH = FH_omegaL;
+    
+    % Run the Friedmann model
+    %[aH, tH, ~] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+    %pH = plot(tH, aH, '-', 'LineWidth', lineWidth, 'Color', red);
+    
+    H_T = 0.6736 * 3.15576 / 3.08567758149137;
+    FH_omegaD = 0.315 - 0.049;
+    FH_omegaL = 0.685;
+    %H1 = H_T; D1 = FH_omegaD; L1 = FH_omegaL;
+    
+    % Run the Friedmann model
+    [a1, t1, ~] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+    planckTime = -t1(1);
+    
+    options = optimset('TolFun',a0);
+    alpha_opt2 = fzero(@(alpha)targetTime(alpha,0.307-0.049), 0.2,options);
+    omegaL = solve_omegaL(0.307, alpha_opt2);
+    [a00, t0, LR_00] = LR_model(0.307, omegaL, alpha_opt2, true, false);
+    LR_00 = LR_00(end);
+    LR_00alpha = LR_00*alpha_opt2;
+    planckTime = -t0(1);
+    
+    H_T = 0.6766 * 3.15576 / 3.08567758149137;
+    FH_omegaD = 0.311 - 0.049;
+    FH_omegaL = 0.689;
+    
+    % Run the Friedmann model
+    [a2, t2, ~] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+    time2 = -t2(1);
+    
+    %t = linspace(t1(1) + 1e-2, 0, 300);
+    n = 300;
+    
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Absolute
+    [t, v] = differenceGraphs(n, t0, a00, t1, a1);
+    pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t0, a00, t2, a2);
+    pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, a1, t2, a2);
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1],...
+        {'Optimal E-m. vs. F-model with H_T = 0.6736 * 1.022...', ...
+         'Optimal E-m. vs. F-model with H_T = 0.6766 * 1.022...', ...
+         'F-model 0.6736 * 1.022... vs. F-model with H_T = 0.6766 * 1.022...', ...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    %title(['Figure 1 ', print_today()])
+    xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
+    axis([-14 1 0 0.002])
+    save_plot('kuva_13_abs', leg, false)
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Relative
+    figure; hold on;
+    
+    [t, v] = differenceGraphsRel(n, t1, a1, t0, a00);
+    pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    %diffEopt_F2 = arrayfun(@(value)difference(value,t0,a00,t2,a2), t);
+    [t, v] = differenceGraphsRel(n, t2, a2, t0, a00);
+    pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    %diffF1_F2 = arrayfun(@(value)difference(value,t1,a1,t2,a2), t);
+    [t, v] = differenceGraphsRel(n, t1, a1, t2, a2);
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1],...
+        {'Optimal E-m. vs. F-model with H_T = 0.6736 * 1.022...', ...
+         'Optimal E-m. vs. F-model with H_T = 0.6766 * 1.022...', ...
+         'F-model 0.6736 * 1.022... vs. F-model with H_T = 0.6766 * 1.022...', ...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    %title(['Figure 1 ', print_today()])
+    xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
+    axis([-14 1 0 0.014])
+    save_plot('kuva_14_rel', leg, false)
+    H_T = 0.6726 * 3.15576 / 3.08567758149137;
+end
+%% 
+%
