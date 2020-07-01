@@ -77,8 +77,7 @@ end
 % Let's denote these iteration variables with primes, so we won't mix them with 
 % the previous integration steps.
 % 
-% Our goal is to have $a' - 1=0$ by changing $h'$, so the secant equation gives 
-% us $h'_{k+1} = h'_k - \frac{(a'_k - 1)(h'_{k-1} - h'_k)}{a'_{k-1} - a'_k}$.
+% Our goal is to have $a' - 1=0$ by changing $h'$.
 % 
 % Let's create vectors containing last two iterations, $[h'_{k-1} ~ h'_k]$ and 
 % $[a'_{k-1} ~ a'_k]$. Our initial values come from iteration indices $p-1$ and 
@@ -88,15 +87,12 @@ end
 % 
 % $a'_1 = a_{p-1}$,                         $a'_2=a_p$.
 % 
-% We limit the steps to 100 and also we want escape the algorithm, if $h'_{k+1}$ 
-% becomes singular or $h'_{k+1} = h'_k$. From the secant equation we can see that 
-% this is equivelant to any of these equations beign true,
-% 
-% $a'_{k-1}-a'_k = 0$,        $a'_k-1=0$,        $h'_{k-1} - h'_k = 0$.
-% 
 % With Friedmann differential equation typically only 6-7 steps is needed, due 
 % to its almost linear shape at $a(T)=1$.
-[a(p), b(p), t(p)] = secantMethod(@(adot,bdot,a,b)a-1, a_dot, b_dot, t(p-1), h, a(p-1), a(p), b(p-1), b(p));
+% 
+% Function for the secant method is defined below.
+[a(p), b(p), t(p)] = secantMethod(@(t,a,b)a-1, t(p-1), h, a(p-1), a(p), b(p-1), b(p), a_dot, b_dot);
+% Save t(p) for the conversion later on
 T = t(p);
 %% Integrating from $T$ to $t_n$
 % If |terminate_T| is true, we slice the arrays and don't iterate anymore. If 
@@ -121,24 +117,30 @@ end
 %% Finding maximum of b / a
 % Finds maximum of $b/a \iff \frac{d (b/a)}{dt} = 0$. By chain rule, we get
 % 
-% $$\frac{d(ba^{-1})}{dt} = a^{-1} \dot{b} - b a^{-2} \dot{a} = 0$$
+% $$0=\frac{d(b/a)}{dt} = \frac{a \dot{b} - b \dot{a}}{a^2}$$
 % 
-% and multiplying both sides with $a^2$, we get $a \dot{b} - b \dot{a} = 0$.
+% and multiplying both sides with $a^2 \neq 0$, we get $a \dot{b} - b \dot{a} 
+% = 0$.
 if findMax
+    equation = @(t,a,b)b_dot(t,a,b)*a - a_dot(t,a,b)*b;
+    % Let's find the indexes, q-1 and q, between which the wanted point lies
     q = 1;
-    while b_dot(t(q), a(q), b(q)) * a(q) - a_dot(t(q), a(q), b(q)) * b(q) > 0 && q < length(a)
+    while equation(t(q), a(q), b(q)) > 0 && q < length(a)
         q = q+1;
     end
     
-    [a(q), b(q), t(q)] = secantMethod(@(adot,bdot,a,b)bdot*a - adot*b, a_dot, b_dot, t(q-1), (q-1)^3 * initial_step, a(q-1), a(q), b(q-1), b(q));
+    [a(q), b(q), t(q)] = secantMethod(equation, ...
+                            t(q-1), (q-1)^3 * initial_step, a(q-1), a(q), b(q-1), b(q), a_dot, b_dot);
 end
 %% 
 % Finally, we do a unit conversion. The algorithm is finished after this line.
 t_converted = 10*(t - T);
 %% Evaluating a Runge-Kutta step
 % Here is the function that evaluates next point, with RK4. The code is straight 
-% forward and the algorithm can be found here,<https://www.nsc.liu.se/~boein/f77to90/rk.html 
-% https://www.nsc.liu.se/~boein/f77to90/rk.html>.
+% forward and can be found here
+% 
+% England, Roland. "Error estimates for Runge-Kutta type solutions to systems 
+% of ordinary differential equations." _The Computer Journal_ 12.2 (1969): 166-170.
 function [a_res, b_res, t_res] = next_point(a_dot, b_dot, a, b, t, h)
     k_0 = h * a_dot(t, a, b);
     l_0 = h * b_dot(t, a, b);
@@ -154,36 +156,60 @@ function [a_res, b_res, t_res] = next_point(a_dot, b_dot, a, b, t, h)
     t_res = t + h;
 end
 %% Secant Method
-function [a,b,t] = secantMethod(fun, a_dot, b_dot, t0, h0, a0, a1, b0, b1)
-    % Initial values for the secant method
-    h_k = [0, h0];
+% We want to solve $f\left(t_0 +h,a\left(t_0 +h\right),b\left(t_0 +h\right)\right)=0$, 
+% with respect to $h$.
+% 
+% Initial values to be provided are,
+% 
+% $a_0 =a\left(t_0 \right)$,      $a_1 =a\left(t_0 +h_0 \right)$,
+% 
+% $b_0 =b\left(t_0 \right)$,      $b_1 =b\left(t_0 +h_0 \right)$,
+% 
+% along with $t_0$ and $h_0$.
+function [a,b,t] = secantMethod(fun, t0, h0, a0, a1, b0, b1, a_dot, b_dot)
+%% 
+% Let's declare two dimensional vectors for $h$ and $f$.
+    h_k = [0, ...
+           h0];
     
-    f_k = [fun(a_dot(t0, a0, b0), b_dot(t0, a0, b0), a0, b0), fun(a_dot(t0+h0, a1, b1), b_dot(t0+h0, a1, b1), a1, b1)];
-    
-    a = (a0+a1)/2 ; b = (b0+b1)/2 ; t = t0 + h0/2;
+    f_k = [fun(t0, a0, b0), ...
+           fun(t0+h0, a1, b1)];
+%% 
+% Set $a$, $b$ and $t$ to something, in case the secant equation is singular 
+% right from the start.
+    a = a0; b = b0; t = t0;
     
     % 100 step limit for the secant method
     for w = 1:100
-        
-        % Conditions for breaking the loop
+%% 
+% Let's calculate, if the secant equation produces singular value or $h_{k+2} 
+% = h_{k+1}$. The secant equation is
+% 
+% $h_{k+2} = h_{k+1} - f(h_{k+1}) \frac{h_{k+1} - h_{k}}{f(h_{k+1}) - f(h_{k})}$.
+% 
+% Condition $h_{k+2} = h_{k+1} \iff f(h_{k+1}) =0$ or $h_{k+1} - h_{k} =0 $.
+% 
+% The secant equation is singular, if $f(h_{k+1}) - f(h_{k}) = 0$.
         if f_k(2) == 0 || h_k(1) - h_k(2) == 0 || f_k(1) - f_k(2) == 0
             break;
+%% 
+% If the equation is ok, we continue:
         else
-            
             % Evaluate new step size with previous iteration with secant equation
             h_new = h_k(2) - ...
                 f_k(2) * (h_k(1)-h_k(2)) / (f_k(1)-f_k(2));
             
+            % Update the older array values
             f_k(1) = f_k(2);
             h_k(1) = h_k(2);
             
             % Calculate new point with RK4
             [a, b, t] =...
                     next_point(a_dot, b_dot, a0, b0, t0, h_new);
-                
-            h_k(2) = h_new;
-            f_k(2) = fun(a_dot(t, a, b), b_dot(t, a, b), a, b);
             
+            % Update the newer aray values
+            h_k(2) = h_new;
+            f_k(2) = fun(t, a, b);
         end
     end
 end
