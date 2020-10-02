@@ -24,6 +24,7 @@ global H_T ; H_T = 0.6726 * correction;
 % precision different algorithms. 
 
 global a0; a0 = 10^-12;
+global stepSizeDiff; stepSizeDiff = 10^13;
 %% 
 % Set options for Matlab's equation system solver |fsolve| and optimizer |fminunc|.
 
@@ -120,16 +121,18 @@ global lineWidth; lineWidth = 1;
 % Figure 8
 %figure_8()
 
-fig_9_to_11()
+%fig_9_to_11()
 
 %plot_diff_H() % TURHA NYKYÄÄN -> H1
-plot_diff_H_error()
+%plot_diff_H_error()
 %plot_diff_Ht()
 
-plot_diff_H_error_age() % BD = 0.307, semiopt
+%plot_diff_H_error_age() % BD = 0.307, semiopt
 %plot_diff_Ht_age() % BD = 0.307, semiopt
 
 %plot_diff_H1()
+
+plotBZero()
 %% Differential Equation Solvers
 % Let's start with a differential equation (30) and a regular equation (31),
 % 
@@ -170,12 +173,12 @@ plot_diff_H_error_age() % BD = 0.307, semiopt
 
 function [a_res, t_res, omega_LR] = LR_model(omegaBD, omegaL, alpha, terminate_T, findMax)
     % Load global variables
-    global H_T t_end a0;
+    global H_T t_end a0 stepSizeDiff;
     
     [a_res,b_res,t_res] = runge_kutta(@(t, a, b)H_T * sqrt(omegaBD/a + alpha*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL), ...
                                       @(t, a, b)a * exp(-t * H_T * sqrt(omegaL)), ...
                                       a0, ...
-                                      t_end/10, a0/10, terminate_T, findMax);
+                                      t_end/10, stepSizeDiff, terminate_T, findMax);
     
     omega_LR = H_T .* sqrt(omegaL) ./ a_res .* b_res;
 end
@@ -419,24 +422,29 @@ end
 % Functions for plotting errors between two graphs. Functions make cubic interpolation 
 % to the data sets and then calculates the difference at n points.
 
-function [pts,y] = differenceGraphs(n, x1, y1, x2, y2, relative)
+function [pts,y] = differenceGraphs(n, x1, y1, x2, y2, type)
     tstart = max(min(x1),min(x2));
     tend   = min(max(x1),max(x2));
     pts = linspace(tstart, tend, n);
-    if relative && abs(interp1(x1,y1,tstart,'pchip')) < 1e-5
+    if type == "rel" && (abs(interp1(x1,y1,tstart,'pchip')) < 1e-5 || abs(interp1(x1,y1,tstart,'pchip')) > 1e5)
+        pts(1) = pts(1)/2 + pts(2)/2;
+    end
+    if type == "div"
         pts(1) = pts(1)/2 + pts(2)/2;
     end
     vals1 = interp1(x1,y1,pts,'pchip');
     vals2 = interp1(x2,y2,pts,'pchip');
-    y = abs(vals1 - vals2);
-    if relative
-        y = abs(y./vals1);
+    y = vals2- vals1;
+    if type == "rel"
+        y = y./vals1;
     end
-    if relative && abs(interp1(x1,y1,tstart,'pchip')) < 1e-5 && abs(interp1(x2,y2,tstart,'pchip')) < 1e-5
+    if type == "div"
+        y = vals2./vals1;
         y(1) = 2*y(1) - y(2);
         pts(1) = 2*pts(1) - pts(2);
-    elseif relative && abs(interp1(x1,y1,tstart,'pchip')) < 1e-5 && abs(interp1(x2,y2,tstart,'pchip')) >= 1e-5
-        y(1) = 1e5;
+    end
+    if type == "rel" && (abs(interp1(x1,y1,tstart,'pchip')) < 1e-5 || abs(interp1(x1,y1,tstart,'pchip')) > 1e5)
+        y(1) = 2*y(1) - y(2);
         pts(1) = 2*pts(1) - pts(2);
     end
 end
@@ -1112,7 +1120,7 @@ function plot_diff_H_error()
     % Set title etc., and save the figure
     title('a(t) error')
     xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
-    axis([-14 1 0 0.003])
+    axis([-14 1 -0.003 0.003])
     save_plot('kuva_a_error_abs', leg, false)
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Relative
@@ -1146,7 +1154,7 @@ function plot_diff_H_error()
     % Set title etc., and save the figure
     title('a(t) error')
     xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
-    axis([-14 1 0 0.014])
+    axis([-14 1 -0.014 0.014])
     save_plot('kuva_a_error_rel', leg, false)
     H_T = 0.6726 * correction;
 end
@@ -1188,15 +1196,47 @@ function plot_diff_H_error_age()
     time2 = -t2(1);
     
     n = 300;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Fixed pt. Absolute
+    [t, v] = differenceGraphs(n, t1, a1, t1, a1, "abs");
+    pE1 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
     
+    [t, v] = differenceGraphs(n, t1, a1, t0, a00, "abs");
+    pE2 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, a1, t2, a2, "abs");
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    h1 = plot(0,0,'w');
+    h2 = plot(0,0,'w');
+    h3 = plot(0,0,'w');
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1 h1 h2 h3],...
+        {'F-m. 1 − F-m. 1', ...
+         'Opt. E-m. − F-m. 1', ...
+         'F-m. 2 − F-m. 1', ...
+         ['E-m. (age opt.): H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(omegaB+omegaD_opt2)],...
+         ['F-m. 1:     H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD1)],...
+         ['F-m. 2:     H_T = ' print_num2(100*H2/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD2)],...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    title('a(t) error')
+    xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
+    axis([-14 1 -0.003 0.003])
+    save_plot('kuva_a_error_abs_2', leg, false)
+    
+    figure; hold on;
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Absolute
-    [t, v] = differenceGraphs(n, t0, a00, t1, a1, false);
+    [t, v] = differenceGraphs(n, t0, a00, t1, a1, "abs");
     pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t0, a00, t2, a2, false);
+    [t, v] = differenceGraphs(n, t0, a00, t2, a2, "abs");
     pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t1, a1, t2, a2, false);
+    [t, v] = differenceGraphs(n, t1, a1, t2, a2, "abs");
     pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
     
     h1 = plot(0,0,'w');
@@ -1218,19 +1258,87 @@ function plot_diff_H_error_age()
     % Set title etc., and save the figure
     title('a(t) error')
     xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
-    axis([-14 1 0 0.003])
+    axis([-14 1 -0.003 0.003])
     save_plot('kuva_a_error_abs', leg, false)
+    
+    figure; hold on;
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Divided
+    [t, v] = differenceGraphs(n, t0, a00, t1, a1, "div");
+    pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t0, a00, t2, a2, "div");
+    pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, a1, t2, a2, "div");
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    h1 = plot(0,0,'w');
+    h2 = plot(0,0,'w');
+    h3 = plot(0,0,'w');
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1 h1 h2 h3],...
+        {'F-model 1 / Optimal E-m.', ...
+         'F-model 2 / Optimal E-m.', ...
+         'F-model 2 / F-model 1', ...
+         ['E-m. (age opt.): H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(omegaB+omegaD_opt2)],...
+         ['F-m. 1:     H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD1)],...
+         ['F-m. 2:     H_T = ' print_num2(100*H2/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD2)],...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    title('a(t) error')
+    xlabel('Time {\itt} in Gyr');
+    axis([-14 1 0.985 1.015])
+    save_plot('kuva_a_error_div', leg, false)
+    
+    figure; hold on;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Fixed pt. Rel
+    [t, v] = differenceGraphs(n, t1, a1, t1, a1, "rel");
+    pE1 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, a1, t0, a00, "rel");
+    pE2 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, a1, t2, a2, "rel");
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    h1 = plot(0,0,'w');
+    h2 = plot(0,0,'w');
+    h3 = plot(0,0,'w');
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1 h1 h2 h3],...
+        {'(F-m. 1 − F-m. 1) / F-m. 1', ...
+         '(Opt. E-m. − F-m. 1) / F-m. 1', ...
+         '(F-m. 2 − F-m. 1) / F-m. 1', ...
+         ['E-m. (age opt.): H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(omegaB+omegaD_opt2)],...
+         ['F-m. 1:     H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD1)],...
+         ['F-m. 2:     H_T = ' print_num2(100*H2/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD2)],...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    title('a(t) error')
+    xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
+    axis([-14 1 -0.012 0.008])
+    save_plot('kuva_a_error_rel_2', leg, false)
+    
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Relative
     figure; hold on;
     
-    [t, v] = differenceGraphs(n, t1, a1, t0, a00, true);
+    [t, v] = differenceGraphs(n, t1, a1, t0, a00, "rel");
     pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t2, a2, t0, a00, true);
+    [t, v] = differenceGraphs(n, t2, a2, t0, a00, "rel");
     pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t1, a1, t2, a2, true);
+    [t, v] = differenceGraphs(n, t1, a1, t2, a2, "rel");
     pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
     
     h1 = plot(0,0,'w');
@@ -1252,7 +1360,7 @@ function plot_diff_H_error_age()
     % Set title etc., and save the figure
     title('a(t) error')
     xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
-    axis([-14 1 0 0.014])
+    axis([-14 1 -0.014 0.014])
     save_plot('kuva_a_error_rel', leg, false)
     H_T = 0.6726 * correction;
 end
@@ -1348,7 +1456,7 @@ function plot_diff_Ht()
     % Set title etc., and save the figure
     xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
     title('H_t error')
-    axis([-14 1 0 0.025])
+    axis([-14 1 -0.025 0.025])
     save_plot('kuva_H_t_error_abs', leg, false)
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Relative
@@ -1382,7 +1490,7 @@ function plot_diff_Ht()
     % Set title etc., and save the figure
     xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
     title('H_t error')
-    axis([-14 1 0 0.012])
+    axis([-14 1 -0.012 0.012])
     save_plot('kuva_H_t_error_rel', leg, false)
     H_T = 0.6726 * correction;
     
@@ -1444,21 +1552,55 @@ function plot_diff_Ht_age()
         'Location',...
         'northeast');
     title('H_t')
-    save_plot('kuva_H_t', leg, false)
+    %save_plot('kuva_H_t', leg, false)
     
     
     %%%%%%%%%
     figure; hold on;
     n = 400;
     
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Bechmark fixed absolute
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t1, H_t_F1, "abs");
+    pE1 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t0, H_t_00, "abs");
+    pE2 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, "abs");
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    h1 = plot(0,0,'w');
+    h2 = plot(0,0,'w');
+    h3 = plot(0,0,'w');
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1 h1 h2 h3],...
+        {'F-m. 1 − F-m. 1', ...
+         'Opt. E-m. − F-m. 1', ...
+         'F-m. 2 − F-m. 1', ...
+         ['E-m. (age opt.): H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(omegaB+omegaD_opt2)],...
+         ['F-m. 1:     H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD1)],...
+         ['F-m. 2:     H_T = ' print_num2(100*H2/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD2)],...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
+    title('H_t error')
+    axis([-14 1 -0.01 0.03])
+    %save_plot('kuva_H_t_error_abs_2', leg, false)
+    
+    figure; hold on;
+    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Absolute
-    [t, v] = differenceGraphs(n, t0, H_t_00, t1, H_t_F1, false);
+    [t, v] = differenceGraphs(n, t0, H_t_00, t1, H_t_F1, "abs");
     pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t0, H_t_00, t2, H_t_F2, false);
+    [t, v] = differenceGraphs(n, t0, H_t_00, t2, H_t_F2, "abs");
     pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, false);
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, "abs");
     pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
     
     h1 = plot(0,0,'w');
@@ -1480,19 +1622,86 @@ function plot_diff_Ht_age()
     % Set title etc., and save the figure
     xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
     title('H_t error')
-    axis([-14 1 0 0.025])
-    save_plot('kuva_H_t_error_abs', leg, false)
+    axis([-14 1 -0.025 0.025])
+    %save_plot('kuva_H_t_error_abs', leg, false)
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Relative
     figure; hold on;
     
-    [t, v] = differenceGraphs(n, t1, H_t_F1, t0, H_t_00, true);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Divided
+    [t, v] = differenceGraphs(n, t0, H_t_00, t1, H_t_F1, "div");
     pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t2, H_t_F2, t0, H_t_00, true);
+    [t, v] = differenceGraphs(n, t0, H_t_00, t2, H_t_F2, "div");
     pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
     
-    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, true);
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, "div");
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    h1 = plot(0,0,'w');
+    h2 = plot(0,0,'w');
+    h3 = plot(0,0,'w');
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1 h1 h2 h3],...
+        {'F-model 1 / Optimal E-m.', ...
+         'F-model 2 / Optimal E-m.', ...
+         'F-model 2 / F-model 1', ...
+         ['E-m. (age opt.): H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(omegaB+omegaD_opt2)],...
+         ['F-m. 1:     H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD1)],...
+         ['F-m. 2:     H_T = ' print_num2(100*H2/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD2)],...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    xlabel('Time {\itt} in Gyr');
+    title('H_t error')
+    axis([-14 1 0.99 1.03])
+    %save_plot('kuva_H_t_error_div', leg, false)
+    
+    figure; hold on;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Bechmark fixed relative
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t1, H_t_F1, "rel");
+    pE1 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t0, H_t_00, "rel");
+    pE2 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, "rel");
+    pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
+    
+    h1 = plot(0,0,'w');
+    h2 = plot(0,0,'w');
+    h3 = plot(0,0,'w');
+    
+    % Set plot legend
+    leg = legend([pE1 pE2 pF1 h1 h2 h3],...
+        {'(F-m. 1 − F-m. 1) / F-m. 1', ...
+         '(Opt. E-m. − F-m. 1) / F-m. 1', ...
+         '(F-m. 2 − F-m. 1) / F-m. 1', ...
+         ['E-m. (age opt.): H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(omegaB+omegaD_opt2)],...
+         ['F-m. 1:     H_T = ' print_num2(100*H1/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD1)],...
+         ['F-m. 2:     H_T = ' print_num2(100*H2/correction) ', Ω^{{\itB}+{\itD}} = ' print_num2(BD2)],...
+        },...
+        'Location',...
+        'northeast');
+    
+    % Set title etc., and save the figure
+    xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
+    title('H_t error')
+    axis([-14 1 -0.002 0.014])
+    %save_plot('kuva_H_t_error_rel_2', leg, false)
+    
+    figure; hold on;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Relative
+    
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t0, H_t_00, "rel");
+    pE1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t2, H_t_F2, t0, H_t_00, "rel");
+    pE2 = plot(t,v,'-.','LineWidth', lineWidth, 'Color', red);
+    
+    [t, v] = differenceGraphs(n, t1, H_t_F1, t2, H_t_F2, "rel");
     pF1 = plot(t,v,'-','LineWidth', lineWidth, 'Color', blue);
     
     h1 = plot(0,0,'w');
@@ -1514,8 +1723,8 @@ function plot_diff_Ht_age()
     % Set title etc., and save the figure
     xlabel('Time {\itt} in Gyr'); ylabel('Relative error')
     title('H_t error')
-    axis([-14 1 0 0.012])
-    save_plot('kuva_H_t_error_rel', leg, false)
+    axis([-14 1 -0.012 0.012])
+    %save_plot('kuva_H_t_error_rel', leg, false)
     H_T = 0.6726 * correction;
     
 end
@@ -1586,7 +1795,7 @@ function plot_diff_H1()
     
     % Set title etc., and save the figure
     xlabel('Time {\itt} in Gyr'); ylabel('Absolute error')
-    axis([-14 1 0 0.005])
+    axis([-14 1 -0.005 0.005])
     save_plot('kuva_a_error_abs_x', leg, false)
     
     %%%%%%%%%%%%%%%% a's
@@ -1607,6 +1816,114 @@ function plot_diff_H1()
     axis([-14 1 0 1])
     draw_y_axis()
     save_plot('kuva_a_x', leg, false)
+end
+
+function plotBZero()
+    figure; hold on
+    global stepSizeDiff
+    global H_T FH_omegaL FH_omegaD
+    global a0;
+    omegaB = 0;
+    global red blue lineWidth
+    global benchmarkAge
+    global correction
+    
+    %H_T = 0.6736 * correction;
+    H1 = H_T;
+    %FH_omegaD = 0.315 - omegaB;
+    FH_omegaD = 0;
+    BD1 = FH_omegaD + omegaB;
+    FH_omegaL = 0.685;
+    
+    
+    % Run the Friedmann model
+    %[a1, t1, LR_F1] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+    %benchmarkAge = -t1(1);
+    %a_dot = @(t, a, b)H_T * sqrt((FH_omegaD + omegaB)/a + 0*H_T*sqrt(FH_omegaL)/a^2*b + a^2*FH_omegaL);
+    %b = LR_F1 / (H_T * sqrt(FH_omegaL)) .* a1;
+    %H_t_F1 = arrayfun(@(p)a_dot(t1(p), a1(p), b(p)), 1:length(a1)).' ./ a1;
+    
+    %[omegaD_opt2, alpha_opt2] = optimizeDalpha();
+    stepSizeDiff = 10^-11;
+    omegaD_opt2 = 0;
+    alpha_opt2 = 1;
+    omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
+    [a00, t0, LR_00] = LR_model(omegaD_opt2 + omegaB, omegaL, alpha_opt2, true, false);
+    a_dot = @(t, a, b)H_T * sqrt((omegaD_opt2 + omegaB)/a + alpha_opt2*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL);
+    b = LR_00 / (H_T * sqrt(omegaL)) .* a00;
+    H_t_00 = arrayfun(@(p)a_dot(t0(p), a00(p), b(p)), 1:length(a00)).' ./ a00;
+    
+    % 10^-8
+    stepSizeDiff = 10^-12;
+    omegaD_opt2 = 0;
+    alpha_opt2 = 1;
+    omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
+    [a06, t6, LR_06] = LR_model(omegaD_opt2 + omegaB, omegaL, alpha_opt2, true, false);
+    a_dot = @(t, a, b)H_T * sqrt((omegaD_opt2 + omegaB)/a + alpha_opt2*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL);
+    b = LR_06 / (H_T * sqrt(omegaL)) .* a06;
+    H_t_06 = arrayfun(@(p)a_dot(t6(p), a06(p), b(p)), 1:length(a06)).' ./ a06;
+    
+    
+    % 10^-16
+    stepSizeDiff = 10^-14;
+    omegaD_opt2 = 0;
+    alpha_opt2 = 1;
+    omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
+    [a016, t16, LR_016] = LR_model(omegaD_opt2 + omegaB, omegaL, alpha_opt2, true, false);
+    a_dot = @(t, a, b)H_T * sqrt((omegaD_opt2 + omegaB)/a + alpha_opt2*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL);
+    b = LR_016 / (H_T * sqrt(omegaL)) .* a016;
+    H_t_016 = arrayfun(@(p)a_dot(t16(p), a016(p), b(p)), 1:length(a016)).' ./ a016;
+    
+%     H_T = 0.6766 * correction;
+%     H2 = H_T;
+%     FH_omegaD = 0.311 - omegaB;
+%     BD2 = FH_omegaD + omegaB;
+%     FH_omegaL = 0.689;
+%     
+%     % Run the Friedmann model
+%     [a2, t2, LR_F2] = F_model(omegaB + FH_omegaD, FH_omegaL, true, false);
+%     time2 = -t2(1);
+%     a_dot = @(t, a, b)H_T * sqrt((FH_omegaD + omegaB)/a + 0*H_T*sqrt(FH_omegaL)/a^2*b + a^2*FH_omegaL);
+%     b = LR_F2 / (H_T * sqrt(FH_omegaL)) .* a2;
+%     H_t_F2 = arrayfun(@(p)a_dot(t2(p), a2(p), b(p)), 1:length(a2)).' ./ a2;
+    
+    p0 = plot(t0, log10(H_t_00.^2), '-','LineWidth', lineWidth, 'Color', red, "Marker","*");
+    p1 = plot(t6, log10(H_t_06.^2), '-','LineWidth', lineWidth, 'Color', blue,  "Marker","*");
+    p2 = plot(t16, log10(H_t_016.^2), '-','LineWidth', lineWidth, 'Color', 'k',"Marker","*");
+    %p2 = plot(t2, log10(H_t_F2), '--','LineWidth', lineWidth, 'Color', blue);
+    
+    xlabel('Time {\itt} in Gyr'); ylabel('log_{10} {\itH}_{\itt}^2')
+    leg = legend([p0, p1, p2],...
+        {'{\ita}_0 = 10^{-12}, initialStep = 10^{-11}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-12}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-14}', ...
+        },...
+        'Location',...
+        'southeast');
+    title(['H_{\itt}^2, H_{\itT} = ', print_num2(100*H1/correction), ', Ω^{\itB} = 0'])
+    %axis([t16(1)-1e-4,t16(1)+6e-4,-1,25])
+    
+    
+    axis([t16(1)-3e-10,t16(1)+6e-10,-1,25])
+    
+    save_plot('kuva_H_t_Bzero', leg, false)
+    
+    figure; hold on;
+    title(['{\ita}_{\itt}, H_{\itT} = ', print_num2(100*H1/correction), ', Ω^{\itB} = 0'])
+    p0 = plot(t0, a00, '-','LineWidth', lineWidth, 'Color', red, "Marker","*");
+    p1 = plot(t6, a06, '-','LineWidth', lineWidth, 'Color', blue, "Marker","*");
+    p2 = plot(t16, a016, '-','LineWidth', lineWidth, 'Color', 'k', "Marker","*");
+    leg = legend([p0, p1, p2],...
+        {'{\ita}_0 = 10^{-12}, initialStep = 10^{-8}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-12}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-16}', ...
+        },...
+        'Location',...
+        'northwest');
+    xlabel('Time {\itt} in Gyr'); ylabel('{\ita}_{\itt}')
+    axis([t16(1)-3e-10,t16(1)+6e-10,0,4e-11])
+    
+    save_plot('kuva_a_t_Bzero', leg, false)
 end
 %% 
 %
