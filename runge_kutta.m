@@ -134,7 +134,7 @@ if findMax
 end
 %% 
 % Finally, we do a unit conversion. The algorithm is finished after this line.
-t_converted = 10*(t - T);
+t_converted = t - T;
 %% Evaluating a Runge-Kutta step
 % Here is the function that evaluates next point, with RK4. The code is straight 
 % forward and can be found here

@@ -15,16 +15,16 @@ close all    % Close all open figures
 format long  % With this Matlab won't round results in console
 %% Calculation Parameters and Global Variables
 % Here we declare global variables, First is Hubble constant. With the correction 
-% factor, the constant is in unit (10 Gyr)^-1.
+% factor, the constant is in unit (Gyr)^-1.
 
-global correction ; correction = 3.15576 / (1.495978707 * 6.48 / pi);
+global correction ; correction = 3.15576 / (1.495978707 * 6.48 / pi) / 10;
 global H_T ; H_T = 0.6726 * correction;
 %% 
 % Precision value: smaller gives more precise result. This single value affects 
 % precision different algorithms. 
 
-global a0; a0 = 10^-12;
-global stepSizeDiff; stepSizeDiff = 10^13;
+global a0; a0 = 1e-12;
+global stepSizeDiff; stepSizeDiff = a0;
 %% 
 % Set options for Matlab's equation system solver |fsolve| and optimizer |fminunc|.
 
@@ -46,9 +46,9 @@ global fminuncOptions ; fminuncOptions = optimoptions('fminunc', ...
 % Maximum t-value for differential equation solver, in unit Gyr and starting 
 % from the big bang. In some cases it is wanted that the solver is terminated 
 % after point $a(T) = 1$ is reached. This is the limit, if we don't want to stop 
-% the solver at this point. 69 Gyr should be sufficient.
+% the solver at this point. 100 Gyr should be sufficient.
 
-global t_end; t_end = 69;
+global t_end; t_end = 100;
 %% 
 % General parameters for the models. 
 
@@ -178,7 +178,7 @@ function [a_res, t_res, omega_LR] = LR_model(omegaBD, omegaL, alpha, terminate_T
     [a_res,b_res,t_res] = runge_kutta(@(t, a, b)H_T * sqrt(omegaBD/a + alpha*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL), ...
                                       @(t, a, b)a * exp(-t * H_T * sqrt(omegaL)), ...
                                       a0, ...
-                                      t_end/10, stepSizeDiff, terminate_T, findMax);
+                                      t_end, stepSizeDiff, terminate_T, findMax);
     
     omega_LR = H_T .* sqrt(omegaL) ./ a_res .* b_res;
 end
@@ -315,7 +315,7 @@ function save_plot(name, leg, plot_HT) % 'leg' stands for legend
         leg.ItemTokenSize = [30,18]*0.60; % default [30,18]
     end
     if plot_HT
-        diff = 0; % gap between legend and H_T box in points
+        diff = 3; % gap between legend and H_T box in points
         legPos = leg.Position;
         leg.Units = 'points';
         legPosPt = leg.Position;
@@ -1844,7 +1844,8 @@ function plotBZero()
     %H_t_F1 = arrayfun(@(p)a_dot(t1(p), a1(p), b(p)), 1:length(a1)).' ./ a1;
     
     %[omegaD_opt2, alpha_opt2] = optimizeDalpha();
-    stepSizeDiff = 10^-11;
+    stepSizeDiff = 1e-12;
+    %a0 = 1e-12;
     omegaD_opt2 = 0;
     alpha_opt2 = 1;
     omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
@@ -1854,10 +1855,10 @@ function plotBZero()
     H_t_00 = arrayfun(@(p)a_dot(t0(p), a00(p), b(p)), 1:length(a00)).' ./ a00;
     
     % 10^-8
-    stepSizeDiff = 10^-12;
+    stepSizeDiff = 1e-13;
     omegaD_opt2 = 0;
     alpha_opt2 = 1;
-    omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
+    %omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
     [a06, t6, LR_06] = LR_model(omegaD_opt2 + omegaB, omegaL, alpha_opt2, true, false);
     a_dot = @(t, a, b)H_T * sqrt((omegaD_opt2 + omegaB)/a + alpha_opt2*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL);
     b = LR_06 / (H_T * sqrt(omegaL)) .* a06;
@@ -1865,14 +1866,15 @@ function plotBZero()
     
     
     % 10^-16
-    stepSizeDiff = 10^-14;
+    stepSizeDiff = 1e-14;
     omegaD_opt2 = 0;
     alpha_opt2 = 1;
-    omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
+    %omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
     [a016, t16, LR_016] = LR_model(omegaD_opt2 + omegaB, omegaL, alpha_opt2, true, false);
     a_dot = @(t, a, b)H_T * sqrt((omegaD_opt2 + omegaB)/a + alpha_opt2*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL);
     b = LR_016 / (H_T * sqrt(omegaL)) .* a016;
     H_t_016 = arrayfun(@(p)a_dot(t16(p), a016(p), b(p)), 1:length(a016)).' ./ a016;
+    
     
 %     H_T = 0.6766 * correction;
 %     H2 = H_T;
@@ -1894,8 +1896,8 @@ function plotBZero()
     
     xlabel('Time {\itt} in Gyr'); ylabel('log_{10} {\itH}_{\itt}^2')
     leg = legend([p0, p1, p2],...
-        {'{\ita}_0 = 10^{-12}, initialStep = 10^{-11}', ...
-        '{\ita}_0 = 10^{-12}, initialStep = 10^{-12}', ...
+        {'{\ita}_0 = 10^{-12}, initialStep = 10^{-12}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-13}', ...
         '{\ita}_0 = 10^{-12}, initialStep = 10^{-14}', ...
         },...
         'Location',...
@@ -1904,9 +1906,10 @@ function plotBZero()
     %axis([t16(1)-1e-4,t16(1)+6e-4,-1,25])
     
     
-    axis([t16(1)-3e-10,t16(1)+6e-10,-1,25])
+    axis([t16(1)-6e-12,t16(1)+8e-12,-4,25])
     
     save_plot('kuva_H_t_Bzero', leg, false)
+    
     
     figure; hold on;
     title(['{\ita}_{\itt}, H_{\itT} = ', print_num2(100*H1/correction), ', Ω^{\itB} = 0'])
@@ -1914,14 +1917,14 @@ function plotBZero()
     p1 = plot(t6, a06, '-','LineWidth', lineWidth, 'Color', blue, "Marker","*");
     p2 = plot(t16, a016, '-','LineWidth', lineWidth, 'Color', 'k', "Marker","*");
     leg = legend([p0, p1, p2],...
-        {'{\ita}_0 = 10^{-12}, initialStep = 10^{-8}', ...
-        '{\ita}_0 = 10^{-12}, initialStep = 10^{-12}', ...
-        '{\ita}_0 = 10^{-12}, initialStep = 10^{-16}', ...
+        {'{\ita}_0 = 10^{-12}, initialStep = 10^{-12}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-13}', ...
+        '{\ita}_0 = 10^{-12}, initialStep = 10^{-14}', ...
         },...
         'Location',...
         'northwest');
     xlabel('Time {\itt} in Gyr'); ylabel('{\ita}_{\itt}')
-    axis([t16(1)-3e-10,t16(1)+6e-10,0,4e-11])
+    axis([t16(1)-6e-12,t16(1)+8e-12,1e-12,2e-12])
     
     save_plot('kuva_a_t_Bzero', leg, false)
 end
