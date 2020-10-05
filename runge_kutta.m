@@ -27,7 +27,7 @@ function [a, b, t_converted] = runge_kutta(a_dot, b_dot, ...
 % The algorithm has three phases: integration until $a_p>1$, solving for the 
 % point $a(T)=1$, and finally integrating from $T$ to $t_n$. The last phase might 
 % not be run, depending on |terminate_T|.
-                                 a_0, t_n, initial_step, terminate_T, findMax)
+                                 a_0, b_0, t_0, t_n, initial_step, terminate_T, findMax)
 %% 
 % Let's calculate the number of steps; Matlab can work with arrays that increase 
 % in size at every iteration, but the code will run faster if we initialize the 
@@ -46,8 +46,8 @@ n = sqrt(1 + 8*n) - 1;
 n = ceil(n / 2) + 1;
 % Initialise the solution arrays
 a = zeros(n,1);  a(1) = a_0;
-b = zeros(n,1);
-t = zeros(n,1);
+b = zeros(n,1);  b(1) = b_0;
+t = zeros(n,1);  t(1) = t_0;
 % Iteration step index
 p = 1;
 %% Integration from $t=0$ until $a_p > 1$
@@ -134,6 +134,9 @@ if findMax
 end
 %% 
 % Finally, we do a unit conversion. The algorithm is finished after this line.
+t = [0; t];
+a = [0; a];
+b = [0; b];
 t_converted = t - T;
 %% Evaluating a Runge-Kutta step
 % Here is the function that evaluates next point, with RK4. The code is straight 

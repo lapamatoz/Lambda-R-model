@@ -46,9 +46,9 @@ global fminuncOptions ; fminuncOptions = optimoptions('fminunc', ...
 % Maximum t-value for differential equation solver, in unit Gyr and starting 
 % from the big bang. In some cases it is wanted that the solver is terminated 
 % after point $a(T) = 1$ is reached. This is the limit, if we don't want to stop 
-% the solver at this point. 100 Gyr should be sufficient.
+% the solver at this point. 80 Gyr should be sufficient.
 
-global t_end; t_end = 100;
+global t_end; t_end = 80;
 %% 
 % General parameters for the models. 
 
@@ -99,7 +99,7 @@ global lineWidth; lineWidth = 1;
 %disp(-t_res(1) - 9.70860731629968)
 
 % Figure 1
-%final_plot_1()
+final_plot_1()
 
 % Figure 2
 %final_plot_50()
@@ -167,17 +167,23 @@ plotBZero()
 % with initial conditions $a(0) = b(0)=0$. Now we can solve $a$ and $b$ numerically, 
 % and finally we can evaluate $\Omega^{\Lambda \text{R}}_t$ with equation (2)
 % 
-% We solve the equations with time unit 10 Gyrs, and the unit conversion to 
-% Gyrs is done in the differential equation solver. See descriptions of |terminate_T| 
-% and |findMax| in the |runge_kutta| algorithm file.
+% See descriptions of |terminate_T| and |findMax| in the |runge_kutta| algorithm 
+% file.
 
 function [a_res, t_res, omega_LR] = LR_model(omegaBD, omegaL, alpha, terminate_T, findMax)
     % Load global variables
     global H_T t_end a0 stepSizeDiff;
+    if omegaBD == 0
+        t0 = a0 / (alpha^(1/3) * H_T * omegaL^(1/6));
+        b0 = t0 * a0;
+    else
+        t0 = 2/(3 * H_T * sqrt(omegaBD)) * a0^(3/2);
+        b0 = t0 * a0;
+    end
     
     [a_res,b_res,t_res] = runge_kutta(@(t, a, b)H_T * sqrt(omegaBD/a + alpha*H_T*sqrt(omegaL)/a^2*b + a^2*omegaL), ...
                                       @(t, a, b)a * exp(-t * H_T * sqrt(omegaL)), ...
-                                      a0, ...
+                                      a0, b0, t0, ...
                                       t_end, stepSizeDiff, terminate_T, findMax);
     
     omega_LR = H_T .* sqrt(omegaL) ./ a_res .* b_res;
@@ -506,6 +512,8 @@ function final_plot_1()
     daspect([1 0.1 1]) % Set aspect ratio
     draw_y_axis()
     save_plot('kuva_1', leg, true)
+    
+    %plot(t1, (t1-t1(1))./a1.^(3/2))
 end
 %% Figure 2
 
@@ -1867,6 +1875,7 @@ function plotBZero()
     
     % 10^-16
     stepSizeDiff = 1e-14;
+    a0 = a0/2;
     omegaD_opt2 = 0;
     alpha_opt2 = 1;
     %omegaL = flatness_solve_omegaL(omegaD_opt2 + omegaB, alpha_opt2);
@@ -1906,7 +1915,7 @@ function plotBZero()
     %axis([t16(1)-1e-4,t16(1)+6e-4,-1,25])
     
     
-    axis([t16(1)-6e-12,t16(1)+8e-12,-4,25])
+    axis([t16(1)-6e-11,t16(1)+8e-11,-4,25])
     
     save_plot('kuva_H_t_Bzero', leg, false)
     
@@ -1924,7 +1933,7 @@ function plotBZero()
         'Location',...
         'northwest');
     xlabel('Time {\itt} in Gyr'); ylabel('{\ita}_{\itt}')
-    axis([t16(1)-6e-12,t16(1)+8e-12,1e-12,2e-12])
+    axis([t16(1)-6e-11,t16(1)+8e-11,0,2e-12])
     
     save_plot('kuva_a_t_Bzero', leg, false)
 end
