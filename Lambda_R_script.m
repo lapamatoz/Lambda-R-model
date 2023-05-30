@@ -14,7 +14,7 @@ G.Hubble_constant = 67.26 * G.convertion_factor;
 G.ode_t_termination = 30;
 
 % Tune this to vary the precision of all numerical algorithms
-G.precision = 2e-2;
+G.precision = 1e-4;
 
 % Options for numerical algorithms
 G.fsolveOptions  = optimoptions('fsolve', ...
