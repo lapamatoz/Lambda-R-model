@@ -1,5 +1,3 @@
-format long % more decimals in console
-
 %%% DECLARE GLOBALLY USED VARIABLES
 
 % They are not defined as global variables, but a struct that is passed
@@ -14,13 +12,13 @@ G.Hubble_constant = 67.26 * G.convertion_factor;
 G.ode_t_termination = 30;
 
 % Tune this to vary the precision of all numerical algorithms
-G.precision = 1e-4;
+G.precision = 1e-3;
 
 % Options for numerical algorithms
 G.fsolveOptions  = optimoptions('fsolve', ...
             'OptimalityTolerance',G.precision, ...
             'FunctionTolerance', G.precision, ...
-            'StepTolerance',G.precision, ...
+            'StepTolerance', G.precision, ...
             'MaxFunctionEvaluations', ceil(sqrt(1/G.precision)), ...
             'MaxIterations', ceil(sqrt(1/G.precision)), ...
             'Display', 'off');
@@ -150,12 +148,12 @@ function omegaL = flatness_solve_Omega_L(G, omegaB, alpha)
 end
 
 % Solves optimal Omega^B
-function [omegaLR, omegaB, omegaL] = optimal_Omega_B(G)
-    [omegaB, omegaLR] = fminunc(@(omegaB)-LR_model_Omega_LR_T(G, omegaB, flatness_solve_Omega_L(G,omegaB,1), 1), ...
+function [Omega_LR, Omega_B, Omega_L] = optimal_Omega_B(G)
+    [Omega_B, Omega_LR] = fminunc(@(Omega_B)-LR_model_Omega_LR_T(G, Omega_B, flatness_solve_Omega_L(G,Omega_B,1), 1), ...
                                    0.0458, ... % initial guess
                                    G.fminuncOptions);
-    omegaLR = -omegaLR; % change sign because of minimization instead of max.
-    omegaL = 1 - omegaB - omegaLR;
+    Omega_LR = -Omega_LR; % change sign because of minimization instead of max.
+    Omega_L = 1 - Omega_B - Omega_LR;
 end
 
 % Solves optimal Omega_D and alpha
