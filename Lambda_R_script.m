@@ -1,6 +1,7 @@
-format long
+format long % more decimals in console
 
 %%% DECLARE GLOBALLY USED VARIABLES
+
 % They are not defined as global variables, but a struct that is passed
 % to functions.
 
@@ -9,6 +10,7 @@ G.convertion_factor = 0.001 * 3.15576 / (1.495978707 * 6.48 / pi);
 G.Hubble_constant = 67.26 * G.convertion_factor;
 
 % Integration termination time
+% (put a low value for speed; high value for robustness)
 G.ode_t_termination = 30;
 
 % Tune this to vary the precision of all numerical algorithms
@@ -30,13 +32,23 @@ G.fminuncOptions = optimoptions('fminunc', ...
             'Display', 'off');
 
 
-% Example
+
+
+%%% Example
+
+
 [a, t, Omega_LR, b] = LR_model(G,0.049,0.6881,1);
 plot(t, a)
 title('Example \LambdaR-model')
 xlabel('Time in Gyrs')
 ylabel('a(t)')
 
+
+
+
+%%% Run algorithms to find various solutions, optimums etc.
+
+% These functions defined below
 
 
 G.Omega_B = 0.049; % this is used in the functions below
@@ -62,15 +74,20 @@ disp('Done!')
 
 %%% ODE SYSTEM
 
-
+% Main function
 function [a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_L, alpha)
-    
+    % G is the global struct
+    % T_index has the property a(T_index) == 1 (or closest to it)
+
     a0 = 1e-16;
     b0 = 0;
     t0 = 0;
 
     y_dot = @(t,y)odes(t, y, G.Hubble_constant, Omega_BD, Omega_L, alpha);
-    opts = odeset('Events',@(t,y)ode_events(t, y, y_dot),'RelTol',1e-1*G.precision,'AbsTol',1e-2*G.precision); % Create events function
+
+    opts = odeset('Events',@(t,y)ode_events(t, y, y_dot), ...
+        'RelTol',1e-1*G.precision, ...
+        'AbsTol',1e-2*G.precision); % Create events function
     
     [t, y, t_events, y_events] = ode23s(y_dot, [t0, G.ode_t_termination], [a0;b0], opts);
     
@@ -93,13 +110,14 @@ function [a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_L, alpha)
     Omega_LR = G.Hubble_constant * sqrt(Omega_L) * b ./ a;
 end
 
+% ODE functions
 function y_dot = odes(t, y, H, omegaBD, omegaL, alpha) % differential equation
     y_dot = [H * sqrt(omegaBD/y(1) + alpha*H*sqrt(omegaL)*y(2)/(y(1))^2 + (y(1))^2*omegaL);
              y(1) * exp(-t * H * sqrt(omegaL))];
 end
 
+% Declare ODE events
 function [value,isterminal,direction] = ode_events(t, y, y_dot)
-    % differential equation events
     y_dot_value = y_dot(t,y);
     value = [y(1) - 1;                                    % event a(t) = 1
              y(1)*y_dot_value(2) - y(2)*y_dot_value(1)];  % event max Omega^{Lambda R}_T
@@ -108,6 +126,7 @@ function [value,isterminal,direction] = ode_events(t, y, y_dot)
     direction = [0; 0];
 end
 
+% This is used in the functions below. It returns a single value, omegaLR_T
 function omegaLR_T = LR_model_Omega_LR_T(G, omegaB, omegaL, alpha)
     [~, ~, omega_LR, ~, ind_T] = LR_model(G, omegaB, omegaL, alpha);
     omegaLR_T = omega_LR(ind_T);
@@ -118,7 +137,7 @@ end
 %%% EQUATION SOLVERS
 
 
-% solver for alpha is very similar
+% Solves omega^Lambda from the flatness equation
 function omegaL = flatness_solve_Omega_L(G, omegaB, alpha)
     if omegaB==1
         omegaL = 0;
@@ -130,7 +149,7 @@ function omegaL = flatness_solve_Omega_L(G, omegaB, alpha)
     omegaL = abs(omegaL); % this is to suppress complex result
 end
 
-% solves optimal Omega^B
+% Solves optimal Omega^B
 function [omegaLR, omegaB, omegaL] = optimal_Omega_B(G)
     [omegaB, omegaLR] = fminunc(@(omegaB)-LR_model_Omega_LR_T(G, omegaB, flatness_solve_Omega_L(G,omegaB,1), 1), ...
                                    0.0458, ... % initial guess
@@ -139,16 +158,17 @@ function [omegaLR, omegaB, omegaL] = optimal_Omega_B(G)
     omegaL = 1 - omegaB - omegaLR;
 end
 
+% Solves optimal Omega_D and alpha
 function [Omega_D_opt, alpha_opt] = optimal_Omega_D_and_alpha(G)
     x = fsolve(@(x)objective_function_optimal_Omega_D_and_alpha(G, x(1), x(2)),[0.26,0.083], G.fsolveOptions);
     Omega_D_opt = x(1);
     alpha_opt = x(2);
 end
 
-% this is used in the above solver
-function values = objective_function_optimal_Omega_D_and_alpha(G, Omega_D, alpha)
+% This is used in the above solver
+function res = objective_function_optimal_Omega_D_and_alpha(G, Omega_D, alpha)
     Omega_L = 1 - G.Omega_LR_opt/G.Omega_B_opt * G.Omega_B - G.Omega_B;
     [~, t, Omega_LR, ~, T_index] = LR_model(G, G.Omega_B + Omega_D, Omega_L, alpha);
-    values(1) = (Omega_D + alpha*Omega_LR(T_index)) / G.Omega_B - G.Omega_LR_opt/G.Omega_B_opt;
-    values(2) = t(1) + G.benchmarkAge;
+    res = [(Omega_D + alpha*Omega_LR(T_index)) / G.Omega_B - G.Omega_LR_opt/G.Omega_B_opt;
+           t(1) + G.benchmarkAge];
  end
