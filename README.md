@@ -1,4 +1,3 @@
-# cosmology_LambdaR
-This respository contains code that is used to calculate and draw Figures in the research paper "A Coincide Problem Related to the $\Lambda$-CDM Cosmological Model" by Harri Ehtamo.
+# Code for *A Coincidence Problem Related to the $\mathit{\Lambda}$-CDM Cosmological Model*
 
-Code by Lauri Jokinen.
+This manual describes the code that generates figures for, *A Coincidence Problem Related to the $\mathit{\Lambda}$-CDM Cosmological Model*, by Harri Ehtamo. See the PDF-file for details.
