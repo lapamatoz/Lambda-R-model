@@ -109,9 +109,9 @@ function [a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_L, alpha)
 end
 
 % ODE functions
-function y_dot = odes(t, y, H, omegaBD, omegaL, alpha) % differential equation
-    y_dot = [H * sqrt(omegaBD/y(1) + alpha*H*sqrt(omegaL)*y(2)/(y(1))^2 + (y(1))^2*omegaL);
-             y(1) * exp(-t * H * sqrt(omegaL))];
+function y_dot = odes(t, y, Hubble_constant, Omega_BD, Omega_L, alpha) % differential equation
+    y_dot = [Hubble_constant * sqrt(Omega_BD/y(1) + alpha*Hubble_constant*sqrt(Omega_L)*y(2)/y(1)^2 + y(1)^2*Omega_L);
+             y(1) * exp(-t * Hubble_constant * sqrt(Omega_L))];
 end
 
 % Declare ODE events
@@ -125,9 +125,9 @@ function [value,isterminal,direction] = ode_events(t, y, y_dot)
 end
 
 % This is used in the functions below. It returns a single value, omegaLR_T
-function omegaLR_T = LR_model_Omega_LR_T(G, omegaB, omegaL, alpha)
-    [~, ~, omega_LR, ~, ind_T] = LR_model(G, omegaB, omegaL, alpha);
-    omegaLR_T = omega_LR(ind_T);
+function Omega_LR_T = LR_model_Omega_LR_T(G, Omega_B, Omega_L, alpha)
+    [~, ~, Omega_LR, ~, ind_T] = LR_model(G, Omega_B, Omega_L, alpha);
+    Omega_LR_T = Omega_LR(ind_T);
 end
 
 
@@ -136,15 +136,15 @@ end
 
 
 % Solves omega^Lambda from the flatness equation
-function omegaL = flatness_solve_Omega_L(G, omegaB, alpha)
-    if omegaB==1
-        omegaL = 0;
+function Omega_L = flatness_solve_Omega_L(G, Omega_B, alpha)
+    if Omega_B==1
+        Omega_L = 0;
         return
     end
-    omegaL = fsolve(@(omegaL) alpha*LR_model_Omega_LR_T(G, omegaB, abs(omegaL), alpha) + omegaB + abs(omegaL) - 1, ...
-                    (1-omegaB)^1.6,... % initial guess
+    Omega_L = fsolve(@(Omega_L) alpha*LR_model_Omega_LR_T(G, Omega_B, abs(Omega_L), alpha) + Omega_B + abs(Omega_L) - 1, ...
+                    (1-Omega_B)^1.6,... % initial guess
                     G.fsolveOptions);
-    omegaL = abs(omegaL); % this is to suppress complex result
+    Omega_L = abs(Omega_L); % this is to suppress complex result
 end
 
 % Solves optimal Omega^B
