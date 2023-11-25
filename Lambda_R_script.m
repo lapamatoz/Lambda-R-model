@@ -69,7 +69,7 @@ G.LR_Omega_L = flatness_solve_Omega_L(G, G.Omega_B, 1);
 
 % Age of the universe, with benchmark model
 [~, ~, t_benchmark] = LR_model(G, 0.049 + 0.268, 0.683, 0);
-G.benchmarkAge = -t_benchmark(1);
+G.benchmark_age = -t_benchmark(1);
 
 % Optimal Omega^B
 disp('Evaluating optimal Omega^B... this may take a while')
@@ -180,5 +180,5 @@ function res = objective_function_optimal_Omega_D_and_alpha(G, Omega_D, alpha)
     % Function 'LR_model' returns value 'Omega_LR_T'
     [~, ~, t, Omega_LR, ~, T_index] = LR_model(G, G.Omega_B + Omega_D, Omega_L, alpha);
     res = [(Omega_D + alpha*Omega_LR(T_index)) / G.Omega_B - G.Omega_LR_opt/G.Omega_B_opt;
-           t(1) + G.benchmarkAge];
+           t(1) + G.benchmark_age];
 end
