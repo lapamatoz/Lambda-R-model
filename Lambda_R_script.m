@@ -1,17 +1,35 @@
-%%% DECLARE GLOBALLY USED VARIABLES
+%%% Code to Compute Solutions and to Generate Figures for Flat Friedmann Differential Equation
 
-% They are not defined as global variables, but a struct that is passed
-% to functions.
+% Author: Lauri Jokinen, lauri.jokinen@iki.fi
+% https://github.com/lauri-jokinen/Lambda-R-model
+
+% This file includes all relevant solvers regarding the figures.
+% To keep the code short, the complete code for the figures is not shown.
+% Code for an example graph is given.
+
+% Contents:
+% * Declaration of global variables (Hubble constant etc.)
+% * Example figure
+% * Evaluate numerical results (Optimal Omega^B etc.)
+% * ODE integration functions
+% * Equation solver functions (flatness equation solver etc.)
+
+
+
+%%% DECLARATION OF GLOBAL VARIABLES
+
+% We define a struct, G, which is then passed to functions.
 
 % Hubble constant, and unit conversion factor
 G.convertion_factor = 0.001 * 3.15576 / (1.495978707 * 6.48 / pi);
 G.Hubble_constant = 67.26 * G.convertion_factor;
 
-% Integration termination time
+% ODE integration termination time
 % (put a low value for speed; high value for robustness)
 G.ode_t_termination = 30;
 
-% Tune this to vary the precision of all numerical algorithms
+% This number sets required precision for all numerical routines
+% Lower number increases precision.
 G.precision = 1e-3;
 
 % Options for numerical algorithms
@@ -31,11 +49,9 @@ G.fminuncOptions = optimoptions('fminunc', ...
 
 
 
+%%% EXAMPLE FIGURE
 
-%%% Example
-
-
-[a, t, Omega_LR, b] = LR_model(G,0.049,0.6881,1);
+[~, a, t, Omega_LR, b] = LR_model(G,0.049,0.6881,1);
 plot(t, a)
 title('Example \LambdaR-model')
 xlabel('Time in Gyrs')
@@ -43,37 +59,36 @@ ylabel('a(t)')
 
 
 
+%%% EVALUATE NUMERICAL RESULTS
+% Evaluate numerical results described in the Code Manual
 
-%%% Run algorithms to find various solutions, optimums etc.
+G.Omega_B = 0.049;
 
-% These functions defined below
-
-
-G.Omega_B = 0.049; % this is used in the functions below
-
-% Solve flatness equation with specific parameters
+% Solve flatness equation, and store result
 G.LR_Omega_L = flatness_solve_Omega_L(G, G.Omega_B, 1);
 
-% Evaluate the age of the Universe, with benchmark model
-[~, t_benchmark] = LR_model(G, 0.049 + 0.268, 0.683, 0);
+% Age of the universe, with benchmark model
+[~, ~, t_benchmark] = LR_model(G, 0.049 + 0.268, 0.683, 0);
 G.benchmarkAge = -t_benchmark(1);
 
+% Optimal Omega^B
 disp('Evaluating optimal Omega^B... this may take a while')
 [G.Omega_LR_opt, G.Omega_B_opt, G.Omega_L_opt] = optimal_Omega_B(G);
 disp('Done!')
 
+% Age-optimal Omega^D and alpha: case 2
 [G.Omega_D_opt, G.alpha_opt] = optimal_Omega_D_and_alpha(G);
 
+% Show the results
+disp(G)
 
 
 
 
-
-
-%%% ODE SYSTEM
+%%% ODE INTEGRATION
 
 % Main function
-function [a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_L, alpha)
+function [Omega_LR_T, a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_L, alpha)
     % G is the global struct
     % T_index has the property a(T_index) == 1 (or closest to it)
 
@@ -106,9 +121,10 @@ function [a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_L, alpha)
     
     % evaluate Omega_Lambda_R(t)
     Omega_LR = G.Hubble_constant * sqrt(Omega_L) * b ./ a;
+    Omega_LR_T = Omega_LR(T_index);
 end
 
-% ODE functions
+% The differential equations
 function y_dot = odes(t, y, Hubble_constant, Omega_BD, Omega_L, alpha) % differential equation
     y_dot = [Hubble_constant * sqrt(Omega_BD/y(1) + alpha*Hubble_constant*sqrt(Omega_L)*y(2)/y(1)^2 + y(1)^2*Omega_L);
              y(1) * exp(-t * Hubble_constant * sqrt(Omega_L))];
@@ -124,24 +140,18 @@ function [value,isterminal,direction] = ode_events(t, y, y_dot)
     direction = [0; 0];
 end
 
-% This is used in the functions below. It returns a single value, omegaLR_T
-function Omega_LR_T = LR_model_Omega_LR_T(G, Omega_B, Omega_L, alpha)
-    [~, ~, Omega_LR, ~, ind_T] = LR_model(G, Omega_B, Omega_L, alpha);
-    Omega_LR_T = Omega_LR(ind_T);
-end
-
 
 
 %%% EQUATION SOLVERS
 
-
-% Solves omega^Lambda from the flatness equation
+% Solves Omega^Lambda from the flatness equation
 function Omega_L = flatness_solve_Omega_L(G, Omega_B, alpha)
     if Omega_B==1
         Omega_L = 0;
         return
     end
-    Omega_L = fsolve(@(Omega_L) alpha*LR_model_Omega_LR_T(G, Omega_B, abs(Omega_L), alpha) + Omega_B + abs(Omega_L) - 1, ...
+    % Function 'LR_model' returns value 'Omega_LR_T'
+    Omega_L = fsolve(@(Omega_L) alpha*LR_model(G, Omega_B, abs(Omega_L), alpha) + Omega_B + abs(Omega_L) - 1, ...
                     (1-Omega_B)^1.6,... % initial guess
                     G.fsolveOptions);
     Omega_L = abs(Omega_L); % this is to suppress complex result
@@ -149,14 +159,15 @@ end
 
 % Solves optimal Omega^B
 function [Omega_LR, Omega_B, Omega_L] = optimal_Omega_B(G)
-    [Omega_B, Omega_LR] = fminunc(@(Omega_B)-LR_model_Omega_LR_T(G, Omega_B, flatness_solve_Omega_L(G,Omega_B,1), 1), ...
+    % Function 'LR_model' returns value 'Omega_LR_T'
+    [Omega_B, Omega_LR] = fminunc(@(Omega_B)-LR_model(G, Omega_B, flatness_solve_Omega_L(G,Omega_B,1), 1), ...
                                    0.0458, ... % initial guess
                                    G.fminuncOptions);
     Omega_LR = -Omega_LR; % change sign because of minimization instead of max.
     Omega_L = 1 - Omega_B - Omega_LR;
 end
 
-% Solves optimal Omega_D and alpha
+% Solves age-optimal Omega^D and alpha: case 2
 function [Omega_D_opt, alpha_opt] = optimal_Omega_D_and_alpha(G)
     x = fsolve(@(x)objective_function_optimal_Omega_D_and_alpha(G, x(1), x(2)),[0.26,0.083], G.fsolveOptions);
     Omega_D_opt = x(1);
@@ -166,7 +177,8 @@ end
 % This is used in the above solver
 function res = objective_function_optimal_Omega_D_and_alpha(G, Omega_D, alpha)
     Omega_L = 1 - G.Omega_LR_opt/G.Omega_B_opt * G.Omega_B - G.Omega_B;
-    [~, t, Omega_LR, ~, T_index] = LR_model(G, G.Omega_B + Omega_D, Omega_L, alpha);
+    % Function 'LR_model' returns value 'Omega_LR_T'
+    [~, ~, t, Omega_LR, ~, T_index] = LR_model(G, G.Omega_B + Omega_D, Omega_L, alpha);
     res = [(Omega_D + alpha*Omega_LR(T_index)) / G.Omega_B - G.Omega_LR_opt/G.Omega_B_opt;
            t(1) + G.benchmarkAge];
- end
+end
