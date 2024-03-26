@@ -33,7 +33,7 @@ G.precision = 1e-3;
 % Options for numerical algorithms
 % Decreasing the value G.precision will increase precision of the algorithms.
 G.fsolveOptions  = optimoptions('fsolve', ...
-            'OptimalityTolerance',G.precision, ...
+            'OptimalityTolerance', G.precision, ...
             'FunctionTolerance', G.precision, ...
             'StepTolerance', G.precision, ...
             'MaxFunctionEvaluations', ceil(sqrt(1/G.precision)), ...
@@ -91,20 +91,20 @@ function [Omega_LR_T, a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_
     % G is the global struct
     % T_index has the property a(T_index) == 1 (or closest to it)
 
-	% Initial values
+    % Initial values
     a0 = 1e-16; b0 = 0; t0 = 0;
 
-	% Define the ODE system with a function 'odes' which is defined below
+    % Define the ODE system with function 'odes' which is defined below
     y_dot = @(t,y)odes(t, y, G.Hubble_constant, Omega_BD, Omega_L, alpha);
 
-	% ODE options:
-	%   define events with a function 'ode_events' which is defined below
-	%   ODE solver's precision is set with G.precision
-    opts = odeset('Events',@(t,y)ode_events(t, y, y_dot), ...
-        'RelTol',1e-1*G.precision, ...
-        'AbsTol',1e-2*G.precision); % Create events function
+    % ODE options:
+    %   define events with function 'ode_events' which is defined below
+    %   ODE solver's precision is set with G.precision
+    opts = odeset('Events', @(t,y)ode_events(t, y, y_dot), ...
+        'RelTol', 1e-1*G.precision, ...
+        'AbsTol', 1e-2*G.precision); % Create events function
     
-	% Run ODE solver
+    % Run ODE solver
     [t, y, t_events, y_events] = ode23s(y_dot, [t0, G.ode_t_termination], [a0;b0], opts);
     
     % Add the 'events' to the result vectors, one by one
@@ -129,14 +129,14 @@ end
 
 % The differential equations
 function y_dot = odes(t, y, Hubble_constant, Omega_BD, Omega_L, alpha)
-	% In pseudocode: y_dot = [a'(t); b'(t)];
+    % In pseudocode: y_dot = [a'(t); b'(t)];
     y_dot = [Hubble_constant * sqrt(Omega_BD/y(1) + alpha*Hubble_constant*sqrt(Omega_L)*y(2)/y(1)^2 + y(1)^2*Omega_L);
              y(1) * exp(-t * Hubble_constant * sqrt(Omega_L))];
 end
 
 % Declare ODE events
 function [value, isterminal, direction] = ode_events(t, y, y_dot)
-    y_dot_value = y_dot(t,y);
+    y_dot_value = y_dot(t, y);
     value = [y(1) - 1;                                    % event a(t) = 1
              y(1)*y_dot_value(2) - y(2)*y_dot_value(1)];  % event max Omega^{Lambda R}_T
     % ignore further definitions
