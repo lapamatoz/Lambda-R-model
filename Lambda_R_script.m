@@ -1,24 +1,22 @@
 %%% Code to Compute Solutions and to Generate Figures for Flat Friedmann Differential Equation
 
-% Author: Lauri Jokinen, lauri.jokinen@iki.fi
-% https://github.com/lauri-jokinen/Lambda-R-model
+% Author: Harri Ehtamo and Lauri Jokinen, lauri.jokinen@iki.fi
+% https://github.com/lauri-jokinen/FDE-with-Lambda-R-model
 
-% This file includes all relevant solvers regarding the figures.
+% This file includes all core routines regarding the figures.
 % To keep the code short, the complete code for the figures is not shown.
-% Code for an example graph is given.
 
 % Contents:
-% * Declaration of global variables (Hubble constant etc.)
+% * Definitions of global variables (Hubble constant, etc.)
 % * Example figure
 % * Evaluate numerical results (Optimal Omega^B etc.)
 % * ODE integration functions
 % * Equation solver functions (flatness equation solver etc.)
 
 
+%%% DEFINITIONS OF GLOBAL VARIABLES
 
-%%% DECLARATION OF GLOBAL VARIABLES
-
-% We define a struct, G, which is then passed to functions.
+% We define a struct G which is then passed to functions.
 
 % Hubble constant, and unit conversion factor
 G.convertion_factor = 0.001 * 3.15576 / (1.495978707 * 6.48 / pi);
@@ -33,6 +31,7 @@ G.ode_t_termination = 30;
 G.precision = 1e-3;
 
 % Options for numerical algorithms
+% Decreasing the value G.precision will increase precision of the algorithms.
 G.fsolveOptions  = optimoptions('fsolve', ...
             'OptimalityTolerance',G.precision, ...
             'FunctionTolerance', G.precision, ...
@@ -48,23 +47,25 @@ G.fminuncOptions = optimoptions('fminunc', ...
             'Display', 'off');
 
 
-
 %%% EXAMPLE FIGURE
 
-[~, a, t, Omega_LR, b] = LR_model(G,0.049,0.6881,1);
+OmegaBD = 0.049;
+OmegaL = 0.6881;
+alpha = 1;
+[~, a, t, Omega_LR, b] = LR_model(G, OmegaBD, OmegaL, alpha);
 plot(t, a)
 title('Example \LambdaR-model')
 xlabel('Time in Gyrs')
 ylabel('a(t)')
 
 
-
 %%% EVALUATE NUMERICAL RESULTS
 % Evaluate numerical results described in the Code Manual
+% We store the values to G
 
 G.Omega_B = 0.049;
 
-% Solve flatness equation, and store result
+% Solve flatness equation
 G.LR_Omega_L = flatness_solve_Omega_L(G, G.Omega_B, 1);
 
 % Age of the universe, with benchmark model
@@ -83,8 +84,6 @@ disp('Done!')
 disp(G)
 
 
-
-
 %%% ODE INTEGRATION
 
 % Main function
@@ -92,16 +91,20 @@ function [Omega_LR_T, a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_
     % G is the global struct
     % T_index has the property a(T_index) == 1 (or closest to it)
 
-    a0 = 1e-16;
-    b0 = 0;
-    t0 = 0;
+	% Initial values
+    a0 = 1e-16; b0 = 0; t0 = 0;
 
+	% Define the ODE system with a function 'odes' which is defined below
     y_dot = @(t,y)odes(t, y, G.Hubble_constant, Omega_BD, Omega_L, alpha);
 
+	% ODE options:
+	%   define events with a function 'ode_events' which is defined below
+	%   ODE solver's precision is set with G.precision
     opts = odeset('Events',@(t,y)ode_events(t, y, y_dot), ...
         'RelTol',1e-1*G.precision, ...
         'AbsTol',1e-2*G.precision); % Create events function
     
+	% Run ODE solver
     [t, y, t_events, y_events] = ode23s(y_dot, [t0, G.ode_t_termination], [a0;b0], opts);
     
     % Add the 'events' to the result vectors, one by one
@@ -125,13 +128,14 @@ function [Omega_LR_T, a, t, Omega_LR, b, T_index] = LR_model(G, Omega_BD, Omega_
 end
 
 % The differential equations
-function y_dot = odes(t, y, Hubble_constant, Omega_BD, Omega_L, alpha) % differential equation
+function y_dot = odes(t, y, Hubble_constant, Omega_BD, Omega_L, alpha)
+	% In pseudocode: y_dot = [a'(t); b'(t)];
     y_dot = [Hubble_constant * sqrt(Omega_BD/y(1) + alpha*Hubble_constant*sqrt(Omega_L)*y(2)/y(1)^2 + y(1)^2*Omega_L);
              y(1) * exp(-t * Hubble_constant * sqrt(Omega_L))];
 end
 
 % Declare ODE events
-function [value,isterminal,direction] = ode_events(t, y, y_dot)
+function [value, isterminal, direction] = ode_events(t, y, y_dot)
     y_dot_value = y_dot(t,y);
     value = [y(1) - 1;                                    % event a(t) = 1
              y(1)*y_dot_value(2) - y(2)*y_dot_value(1)];  % event max Omega^{Lambda R}_T
@@ -141,20 +145,15 @@ function [value,isterminal,direction] = ode_events(t, y, y_dot)
 end
 
 
-
 %%% EQUATION SOLVERS
 
 % Solves Omega^Lambda from the flatness equation
 function Omega_L = flatness_solve_Omega_L(G, Omega_B, alpha)
-    if Omega_B==1
-        Omega_L = 0;
-        return
-    end
     % Function 'LR_model' returns value 'Omega_LR_T'
     Omega_L = fsolve(@(Omega_L) alpha*LR_model(G, Omega_B, abs(Omega_L), alpha) + Omega_B + abs(Omega_L) - 1, ...
                     (1-Omega_B)^1.6,... % initial guess
                     G.fsolveOptions);
-    Omega_L = abs(Omega_L); % this is to suppress complex result
+    Omega_L = real(Omega_L); % due to numerical inaccuracies, the result may have a small imaginary component
 end
 
 % Solves optimal Omega^B
@@ -163,7 +162,7 @@ function [Omega_LR, Omega_B, Omega_L] = optimal_Omega_B(G)
     [Omega_B, Omega_LR] = fminunc(@(Omega_B)-LR_model(G, Omega_B, flatness_solve_Omega_L(G,Omega_B,1), 1), ...
                                    0.0458, ... % initial guess
                                    G.fminuncOptions);
-    Omega_LR = -Omega_LR; % change sign because of minimization instead of max.
+    Omega_LR = -Omega_LR; % change sign because above we have minimization instead of maximization
     Omega_L = 1 - Omega_B - Omega_LR;
 end
 
