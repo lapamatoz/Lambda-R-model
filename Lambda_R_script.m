@@ -1,6 +1,7 @@
-%%% Code to Compute Solutions and to Generate Figures for Flat Friedmann Differential Equation
+%%% Manual and Code to Compute Solutions and to Generate Figures for Flat Friedmann Differential Equation
 
-% Author: Harri Ehtamo and Lauri Jokinen, lauri.jokinen@iki.fi
+% Harri Ehtamo and Lauri Jokinen.
+% The code is maintained by Lauri Jokinen, lauri.jokinen@iki.fi.
 % https://github.com/lauri-jokinen/FDE-with-Lambda-R-model
 
 % This file includes all core routines regarding the figures.
